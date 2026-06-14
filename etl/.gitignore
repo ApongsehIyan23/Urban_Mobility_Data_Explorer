@@ -1,10 +1,18 @@
+# Virtual environment
 venv/
+
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
-.env
-data/raw/
-data/processed/
-data/logs/
+
+# All data folders - raw downloads, processed output, logs
+data/
+
+# Common data file types
 *.parquet
 *.csv
+*.json
+
+# Environment variables
+.env
