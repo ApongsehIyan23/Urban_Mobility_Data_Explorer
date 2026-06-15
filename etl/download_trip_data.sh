@@ -22,6 +22,12 @@ FILES=(
     "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-10.parquet"
     "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-11.parquet"
     "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-12.parquet"
+
+    # Taxi Zone Lookup Table (CSV)
+    "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+
+    # Taxi Zone Spatial Metadata (Parquet)
+    "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zones.zip"
 )
 
 # 1. Dependency & Environment Checks
