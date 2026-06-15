@@ -1,3 +1,7 @@
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 import os
 import pandas as pd
 from glob import glob
@@ -291,7 +295,7 @@ class TLCCleaner:
             f.write(f"  Passenger range: 1–4 passengers only\n")
             f.write(f"  Date range: 2025-01-01 to 2025-12-31\n")
 
-        print(f"\n  Cleaning summary saved → {path}")
+        print(f"\n  Cleaning summary saved -> {path}")
 
     def _cleanup_monthly_files(self):
         """
@@ -323,8 +327,8 @@ class TLCCleaner:
     def run(self):
         """
         Orchestrates the full cleaning pipeline across all 12 months:
-        load → rename → impute → filter → engineer → join zones →
-        normalize timestamps → save monthly files → merge via DuckDB → summarize
+        load -> rename -> impute -> filter -> engineer -> join zones ->
+        normalize timestamps -> save monthly files -> merge via DuckDB -> summarize
         """
         import duckdb
 
@@ -379,8 +383,7 @@ class TLCCleaner:
             )
             del clean_df, excluded_df
 
-        # MERGE PHASE — Combine monthly files on disk via DuckDB (no RAM spike)
-        # ------------------------------------------------------------------
+        # MERGE PHASE — Combine monthly files on disk via DuckDB
 
         # Merge all clean monthly parquet files into one combined file
         print("\nMerging all clean months into single file via DuckDB...")
@@ -400,8 +403,8 @@ class TLCCleaner:
         final_count = duckdb.execute(
             f"SELECT COUNT(*) FROM read_parquet('{clean_path}')"
         ).fetchone()[0]
-        print(f"Clean data saved    → {clean_path}")
-        print(f"Final row count     → {final_count:,}")
+        print(f"Clean data saved    -> {clean_path}")
+        print(f"Final row count     -> {final_count:,}")
 
         # Merge all monthly exclusion CSVs into one combined log
         print("\nMerging all exclusion logs...")
@@ -420,8 +423,8 @@ class TLCCleaner:
 
         exclusion_count = duckdb.execute(
             f"SELECT COUNT(*) FROM read_csv_auto('{exclusion_path}')").fetchone()[0]
-        print(f"Exclusion log saved → {exclusion_path}")
-        print(f"Total excluded rows → {exclusion_count:,}")
+        print(f"Exclusion log saved -> {exclusion_path}")
+        print(f"Total excluded rows -> {exclusion_count:,}")
 
 
         # Cleanup
