@@ -231,3 +231,25 @@ class TLCCleaner:
         return df
     
 
+    def _print_month_summary(self, label: str, raw_count: int,
+                              clean_count: int, excluded_count: int,
+                              exclusion_breakdown: dict):
+        """Prints per-month cleaning statistics to console."""
+        retention = (clean_count / raw_count * 100) if raw_count > 0 else 0
+        sep = "=" * 60
+
+        print(f"\n{sep}")
+        print(f"  CLEANED: {label}")
+        print(sep)
+        print(f"  Raw rows:      {raw_count:>12,}")
+        print(f"  Clean rows:    {clean_count:>12,}")
+        print(f"  Excluded rows: {excluded_count:>12,}")
+        print(f"  Retention:     {retention:>11.2f}%")
+        print(f"\n  --- Exclusion Breakdown ---")
+        for reason, count in sorted(exclusion_breakdown.items(), key=lambda x: -x[1]):
+            print(f" {reason:<35} {count:>10,}")
+    
+    
+    
+    
+
