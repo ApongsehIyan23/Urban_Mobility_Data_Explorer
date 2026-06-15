@@ -207,5 +207,27 @@ class TLCCleaner:
 
         return df
     
+    def _engineer_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Derives new analytical columns from existing fields.
+        """
+        # Feature 1 — Trip duration in minutes
+        df["trip_duration_minutes"] = (
+            (df["dropoff_datetime"] - df["pickup_datetime"])
+            .dt.total_seconds() / 60
+        ).round(2)
+
+        # Feature 2 — Fare per mile (cost efficiency metric)
+        df["fare_per_mile"] = (df["fare_amount"] / df["trip_distance"]).round(4)
+
+        # Feature 3 — Time of day category
+        hour = df["pickup_datetime"].dt.hour
+        # Simpler direct mapping
+        df["time_of_day"] = "Night"
+        df.loc[(hour >= 5)  & (hour < 12), "time_of_day"] = "Morning"
+        df.loc[(hour >= 12) & (hour < 17), "time_of_day"] = "Afternoon"
+        df.loc[(hour >= 17) & (hour < 21), "time_of_day"] = "Evening"
+
+        return df
     
 
