@@ -293,7 +293,33 @@ class TLCCleaner:
 
         print(f"\n  Cleaning summary saved → {path}")
 
-    
+    def _cleanup_monthly_files(self):
+        """
+        Deletes all intermediate monthly clean parquet files and
+        monthly exclusion CSV files after they have been merged
+        into single combined output files via DuckDB.
+        Called only after successful merge of both outputs.
+        """
+        import glob as glob_module
+
+        # Delete monthly clean parquet files
+        monthly_clean_files = glob_module.glob(
+            os.path.join(self.processed_dir, "yellow_2025-*_clean.parquet")
+        )
+        for f in monthly_clean_files:
+            os.remove(f)
+
+        # Delete monthly exclusion CSV files
+        monthly_exclusion_files = glob_module.glob(
+            os.path.join(self.log_dir, "exclusions_2025-*.csv")
+        )
+        for f in monthly_exclusion_files:
+            os.remove(f)
+
+        print(f"  Deleted {len(monthly_clean_files)} monthly clean parquet files.")
+        print(f"  Deleted {len(monthly_exclusion_files)} monthly exclusion CSV files.")
+
+
     def run(self):
         """
         Orchestrates the full cleaning pipeline across all 12 months:
@@ -388,13 +414,19 @@ class TLCCleaner:
 
         duckdb.execute(f"""
             COPY (
-                SELECT * FROM read_csv_auto('{monthly_exclusion_pattern}')) TO '{exclusion_path}'
+                SELECT * FROM read_csv_auto('{monthly_exclusion_pattern}')
+                ) TO '{exclusion_path}'
             """)
 
         exclusion_count = duckdb.execute(
             f"SELECT COUNT(*) FROM read_csv_auto('{exclusion_path}')").fetchone()[0]
         print(f"Exclusion log saved → {exclusion_path}")
         print(f"Total excluded rows → {exclusion_count:,}")
+
+
+        # Cleanup
+        print("\nCleaning up intermediate monthly files...")
+        self._cleanup_monthly_files()
 
         # Save cleaning summary report
         self._save_cleaning_summary()
