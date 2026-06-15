@@ -168,7 +168,44 @@ class TLCCleaner:
             df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
         return df
     
-    
+    def _join_zones(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Joins taxi_zone_lookup.csv to trip data for both pickup
+        and dropoff locations. Adds borough, zone name, and
+        service zone for each.
+        """
+        lookup = self.zone_lookup.rename(columns={
+            "LocationID":   "location_id",
+            "Borough":      "borough",
+            "Zone":         "zone",
+            "service_zone": "service_zone"
+        })
+
+        # Join for pickup location
+        df = df.merge(
+            lookup.rename(columns={
+                "location_id": "pu_location_id",
+                "borough":     "pu_borough",
+                "zone":        "pu_zone",
+                "service_zone":"pu_service_zone"
+            }),
+            on="pu_location_id",
+            how="left"
+        )
+
+        # Join for dropoff location
+        df = df.merge(
+            lookup.rename(columns={
+                "location_id": "do_location_id",
+                "borough":     "do_borough",
+                "zone":        "do_zone",
+                "service_zone":"do_service_zone"
+            }),
+            on="do_location_id",
+            how="left"
+        )
+
+        return df
     
     
 
