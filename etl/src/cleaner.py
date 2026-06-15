@@ -248,8 +248,58 @@ class TLCCleaner:
         print(f"\n  --- Exclusion Breakdown ---")
         for reason, count in sorted(exclusion_breakdown.items(), key=lambda x: -x[1]):
             print(f" {reason:<35} {count:>10,}")
+
+    
+    def _save_cleaning_summary(self):
+        """Writes the full year cleaning summary to cleaning_summary.txt."""
+        path = os.path.join(self.log_dir, "cleaning_summary.txt")
+        total_raw     = sum(s["raw_count"] for s in self.monthly_stats)
+        total_clean   = sum(s["clean_count"] for s in self.monthly_stats)
+        total_excluded= sum(s["excluded_count"] for s in self.monthly_stats)
+        retention     = (total_clean / total_raw * 100) if total_raw > 0 else 0
+
+        # Aggregate exclusion reasons across all months
+        agg_reasons = {}
+        for s in self.monthly_stats:
+            for reason, count in s["exclusion_breakdown"].items():
+                agg_reasons[reason] = agg_reasons.get(reason, 0) + count
+
+        with open(path, "w") as f:
+            f.write("=" * 60 + "\n")
+            f.write("TLC Yellow Taxi 2025 — Cleaning Summary\n")
+            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 60 + "\n\n")
+
+            f.write("FULL YEAR OVERVIEW:\n")
+            f.write(f"  Total raw rows:      {total_raw:>12,}\n")
+            f.write(f"  Total clean rows:    {total_clean:>12,}\n")
+            f.write(f"  Total excluded:      {total_excluded:>12,}\n")
+            f.write(f"  Overall retention:   {retention:>11.2f}%\n\n")
+
+            f.write("PER MONTH BREAKDOWN:\n")
+            f.write(f"  {'Month':<12} {'Raw Rows':>12} {'Clean Rows':>12} "
+                    f"{'Excluded':>12} {'Retention%':>12}\n")
+            f.write("  " + "-" * 52 + "\n")
+            for s in self.monthly_stats:
+                r = (s["clean_count"] / s["raw_count"] * 100) if s["raw_count"] > 0 else 0
+                f.write(f"  {s['month']:<12} {s['raw_count']:>12,} "
+                        f"{s['clean_count']:>12,} {s['excluded_count']:>12,} "
+                        f"{r:>11.2f}%\n")
+
+            f.write("\nEXCLUSION BREAKDOWN (all months combined):\n")
+            for reason, count in sorted(agg_reasons.items(), key=lambda x: -x[1]):
+                f.write(f"  {reason:<40} {count:>12,}\n")
+
+            f.write("\nFINAL CLEAN DATASET:\n")
+            f.write(f"  Output: data/processed/yellow_2025_clean.parquet\n")
+            f.write(f"  Passenger range: 1–4 passengers only\n")
+            f.write(f"  Date range: 2025-01-01 to 2025-12-31\n")
+
+        print(f"\n  Cleaning summary saved → {path}")
+
     
     
+
     
     
 
