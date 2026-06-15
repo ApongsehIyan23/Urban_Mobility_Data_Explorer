@@ -66,3 +66,25 @@ class TLCCleaner:
         self.all_clean_dfs     = []
         self.all_exclusion_dfs = []
         self.monthly_stats     = []
+
+    
+    def _load_month(self, filepath: str) -> pd.DataFrame:
+        """Load a monthly parquet file and rename columns to snake_case."""
+        df = pd.read_parquet(filepath)
+        df = df.rename(columns=self.COLUMN_RENAME_MAP)
+        return df
+
+    def _get_month_label(self, filepath: str) -> str:
+        """Extract month label from filename e.g. '2025-01'."""
+        return os.path.basename(filepath).replace("yellow_tripdata_", "").replace(".parquet", "")
+
+    def _impute_nulls(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Fill nulls in non-critical fields with defined defaults
+        before filtering rules are applied.
+        Only rows that survive the passenger_count filter reach this stage.
+        """
+        for col, default in self.IMPUTE_MAP.items():
+            if col in df.columns:
+                df[col] = df[col].fillna(default)
+        return df
