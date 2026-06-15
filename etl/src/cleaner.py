@@ -298,6 +298,101 @@ class TLCCleaner:
         print(f"\n  Cleaning summary saved → {path}")
 
     
+    def run(self):
+        """
+        Orchestrates the full cleaning pipeline across all 12 months:
+        load → rename → impute → filter → engineer → join zones →
+        normalize timestamps → accumulate → summarize
+        """
+        print("TLC Yellow Taxi 2025 — Cleaning Pipeline")
+        print(f"Files to process: {len(self.files)}")
+
+        for filepath in self.files:
+            label = self._get_month_label(filepath)
+            print(f"\nProcessing {label}...")
+
+            # Step 1 — Load and rename columns
+            df = self._load_month(filepath)
+            raw_count = len(df)
+
+            # Step 2 — Impute nulls before filtering
+            df = self._impute_nulls(df)
+
+            # Step 3 — Apply all 14 filter rules
+            clean_df, excluded_df = self._apply_filters(df)
+
+            # Step 4 — Engineer derived features (before timestamp normalization)
+            clean_df = self._engineer_features(clean_df)
+
+            # Step 5 — Join zone lookup for pickup and dropoff
+            clean_df = self._join_zones(clean_df)
+
+            # Step 6 — Normalize timestamps to DB-ready string format
+            clean_df = self._normalize_timestamps(clean_df)
+
+            # Step 7 — Tag excluded rows with month label for combined log
+            excluded_df["month"] = label
+
+            # Step 8 — Compute exclusion breakdown for this month
+            exclusion_breakdown = {}
+            for reasons_str in excluded_df["flag_reasons"]:
+                for reason in reasons_str.split("|"):
+                    if reason:
+                        exclusion_breakdown[reason] = exclusion_breakdown.get(reason, 0) + 1
+
+            # Step 9 — Store stats and accumulate dataframes
+            self.monthly_stats.append({
+                "month":              label,
+                "raw_count":          raw_count,
+                "clean_count":        len(clean_df),
+                "excluded_count":     len(excluded_df),
+                "exclusion_breakdown":exclusion_breakdown
+            })
+            self.all_clean_dfs.append(clean_df)
+            self.all_exclusion_dfs.append(excluded_df)
+
+            # Step 10 — Print month summary
+            self._print_month_summary(
+                label, raw_count, len(clean_df),
+                len(excluded_df), exclusion_breakdown
+            )
+
+            # Free memory
+            del df, clean_df, excluded_df
+
+        # Save combined clean output
+        print("\nCombining all clean months into single file...")
+        combined_clean = pd.concat(self.all_clean_dfs, ignore_index=True)
+        clean_path = os.path.join(self.processed_dir, "yellow_2025_clean.parquet")
+        combined_clean.to_parquet(clean_path, index=False)
+        print(f"Clean data saved → {clean_path}")
+        print(f"Final shape: {combined_clean.shape[0]:,} rows x {combined_clean.shape[1]} columns")
+
+        # Save combined exclusion log
+        print("\nSaving combined exclusion log...")
+        combined_exclusions = pd.concat(self.all_exclusion_dfs, ignore_index=True)
+        exclusion_path = os.path.join(self.log_dir, "exclusions_2025_all.csv")
+        combined_exclusions.to_csv(exclusion_path, index=False)
+        print(f"Exclusion log saved → {exclusion_path}")
+        print(f"Total excluded rows: {len(combined_exclusions):,}")
+
+        # Save cleaning summary
+        self._save_cleaning_summary()
+
+        print("\nPipeline complete.")
+
+
+#Launch the cleaner when this script is run directly
+
+if __name__ == "__main__":
+    cleaner = TLCCleaner(
+        data_dir      = "data/raw",
+        processed_dir = "data/processed",
+        log_dir       = "data/logs"
+    )
+    cleaner.run()
+
+
     
 
     
