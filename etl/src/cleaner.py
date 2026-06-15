@@ -149,4 +149,26 @@ class TLCCleaner:
         reasons = reasons.str.rstrip("|")
         return reasons
     
+    def _apply_filters(self, df: pd.DataFrame) -> tuple:
+        """
+        Applies all 14 exclusion rules.
+        """
+        reasons = self._build_exclusion_mask(df)
+
+        excluded_mask = reasons != ""
+        clean_df      = df[~excluded_mask].copy()
+        excluded_df   = df[excluded_mask].copy()
+        excluded_df["flag_reasons"] = reasons[excluded_mask]
+
+        return clean_df, excluded_df
     
+    def _normalize_timestamps(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Convert timestamps to DB-ready string format YYYY-MM-DD HH:MM:SS."""
+        for col in ["pickup_datetime", "dropoff_datetime"]:
+            df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
+        return df
+    
+    
+    
+    
+
