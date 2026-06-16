@@ -148,9 +148,8 @@ def run_insertion():
 
     import sqlite3
     raw_conn = sqlite3.connect(
-        os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "data", "mobility.db")
-    )
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "mobility.db")
+)
 
     insert_zones(raw_conn)
 
@@ -164,7 +163,6 @@ def run_insertion():
     raw_conn.close()
     print("=" * 50)
     print("Insertion pipeline complete.")
-
 
 if __name__ == "__main__":
     run_insertion()
