@@ -50,23 +50,23 @@ class MinHeap:
     def right_child(self, index):
         return 2 * index + 2
 
-    def _swap(self, i, j):
+    def swap(self, i, j):
         self.zones[i], self.zones[j] = self.zones[j], self.zones[i]
 
-    def _bubble_up(self, index):
+    def bubble_up(self, index):
         while index > 0:
             parent = self._parent(index)
             if self.zones[index][0] < self.zones[parent][0]:
-                self._swap(index, parent)
+                self.swap(index, parent)
                 index = parent
             else:
                 break
 
-    def _bubble_down(self, index):
+    def bubble_down(self, index):
         while True:
             smallest = index
-            left  = self._left_child(index)
-            right = self._right_child(index)
+            left  = self.left_child(index)
+            right = self.right_child(index)
 
             if left < self.size() and self.zones[left][0] < self.zones[smallest][0]:
                 smallest = left
@@ -75,7 +75,7 @@ class MinHeap:
                 smallest = right
 
             if smallest != index:
-                self._swap(index, smallest)
+                self.swap(index, smallest)
                 index = smallest
             else:
                 break
@@ -84,10 +84,10 @@ class MinHeap:
 
         if self.size() < self.k:
             self.zones.append((count, location_id, zone_name, borough))
-            self._bubble_up(self.size() - 1)
+            self.bubble_up(self.size() - 1)
         elif count > self.zones[0][0]:
             self.zones[0] = (count, location_id, zone_name, borough)
-            self._bubble_down(0)
+            self.bubble_down(0)
 
     def peek_min(self):
         if self.size() == 0:
