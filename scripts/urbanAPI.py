@@ -8,13 +8,11 @@ from zone_rank import get_top_zones
 app = Flask(__name__)
 CORS(app)
 
-# Database path
 UMD_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "data", "mobility.db"
 )
 
-# GeoJSON path
 GEOJSON_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..", "etl", "data", "raw", "taxi_zones.geojson"
@@ -26,21 +24,18 @@ def open_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-#Endpoints
+
 @app.route("/api/zones", methods=["GET"])
 def find_zones():
     conn = open_db()
     cursor = conn.cursor()
-
     cursor.execute("""
         SELECT location_id, borough, zone_name, service_zone
         FROM taxi_zones
         ORDER BY borough, zone_name
     """)
-
     zones = [dict(row) for row in cursor.fetchall()]
     conn.close()
-
     return jsonify({
         "status": "success",
         "count": len(zones),
@@ -48,15 +43,14 @@ def find_zones():
     })
 
 
-
 @app.route("/api/trips", methods=["GET"])
 def find_trips():
     borough     = request.args.get("borough")
     hour        = request.args.get("hour")
     time_of_day = request.args.get("time_of_day")
-    limit       = request.args.get("limit", 100)
+    limit       = request.args.get("limit", 500)
 
-    query  = "SELECT * FROM taxi_trips WHERE 1=1"
+    query  = "SELECT * FROM taxi_trips WHERE id % 100 = 0"
     params = []
 
     if borough:
@@ -87,7 +81,6 @@ def find_trips():
     })
 
 
-
 @app.route("/api/insights/hourly", methods=["GET"])
 def find_hourly_insights():
     borough     = request.args.get("borough")
@@ -96,11 +89,11 @@ def find_hourly_insights():
     query = """
         SELECT
             CAST(strftime('%H', pickup_datetime) AS INTEGER) AS hour,
-            COUNT(*) AS trip_count,
+            COUNT(*) * 100 AS trip_count,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration
         FROM taxi_trips
-        WHERE 1=1
+        WHERE id % 100 = 0
     """
     params = []
 
@@ -129,9 +122,7 @@ def find_hourly_insights():
 @app.route("/api/insights/top-zones", methods=["GET"])
 def find_top_pickup_zones():
     top_k = request.args.get("k", 15)
-
     top_zones = get_top_zones(k=int(top_k))
-
     return jsonify({
         "status": "success",
         "algorithm": "MinHeap O(n log k)",
@@ -149,7 +140,7 @@ def find_borough_summary():
     query = """
         SELECT
             pu_borough AS borough,
-            COUNT(*) AS total_trips,
+            COUNT(*) * 100 AS total_trips,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_distance), 2) AS avg_distance,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
@@ -157,6 +148,7 @@ def find_borough_summary():
             ROUND(AVG(speed_mph), 2) AS avg_speed
         FROM taxi_trips
         WHERE pu_borough IS NOT NULL
+        AND id % 100 = 0
     """
     params = []
 
@@ -186,7 +178,6 @@ def find_borough_summary():
     })
 
 
-
 @app.route("/api/geojson", methods=["GET"])
 def find_geojson():
     try:
@@ -194,8 +185,10 @@ def find_geojson():
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT pu_location_id AS location_id, COUNT(*) AS trip_count
+            SELECT pu_location_id AS location_id,
+                   COUNT(*) * 100 AS trip_count
             FROM taxi_trips
+            WHERE id % 100 = 0
             GROUP BY pu_location_id
         """)
 
@@ -224,50 +217,46 @@ def find_summary_stats():
     conn = open_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) AS total_trips FROM taxi_trips")
-    total_trips = cursor.fetchone()["total_trips"]
+    cursor.execute("""
+        SELECT
+            COUNT(*) * 100 AS total_trips,
+            ROUND(AVG(fare_amount), 2) AS avg_fare,
+            ROUND(AVG(trip_distance), 2) AS avg_distance,
+            ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
+            ROUND(AVG(speed_mph), 2) AS avg_speed
+        FROM taxi_trips
+        WHERE id % 100 = 0
+    """)
 
-    cursor.execute("SELECT ROUND(AVG(fare_amount), 2) AS avg_fare FROM taxi_trips")
-    avg_fare = cursor.fetchone()["avg_fare"]
-
-    cursor.execute("SELECT ROUND(AVG(trip_distance), 2) AS avg_distance FROM taxi_trips")
-    avg_distance = cursor.fetchone()["avg_distance"]
-
-    cursor.execute("SELECT ROUND(AVG(trip_duration_minutes), 2) AS avg_duration FROM taxi_trips")
-    avg_duration = cursor.fetchone()["avg_duration"]
+    stats = dict(cursor.fetchone())
 
     cursor.execute("""
         SELECT CAST(strftime('%H', pickup_datetime) AS INTEGER) AS hour,
                COUNT(*) AS trip_count
         FROM taxi_trips
+        WHERE id % 100 = 0
         GROUP BY hour
         ORDER BY trip_count DESC
         LIMIT 1
     """)
-    busiest_hour = cursor.fetchone()["hour"]
+    stats["busiest_hour"] = cursor.fetchone()["hour"]
 
     cursor.execute("""
         SELECT pu_borough AS borough, COUNT(*) AS trip_count
         FROM taxi_trips
         WHERE pu_borough IS NOT NULL
+        AND id % 100 = 0
         GROUP BY pu_borough
         ORDER BY trip_count DESC
         LIMIT 1
     """)
-    busiest_borough = cursor.fetchone()["borough"]
+    stats["busiest_borough"] = cursor.fetchone()["borough"]
 
     conn.close()
 
     return jsonify({
         "status": "success",
-        "data": {
-            "total_trips":     total_trips,
-            "avg_fare":        avg_fare,
-            "avg_distance":    avg_distance,
-            "avg_duration":    avg_duration,
-            "busiest_hour":    busiest_hour,
-            "busiest_borough": busiest_borough
-        }
+        "data": stats
     })
 
 
@@ -282,13 +271,14 @@ def find_weekend_vs_weekday():
                 WHEN 1 THEN 'Weekend'
                 ELSE 'Weekday'
             END AS day_type,
-            COUNT(*) AS total_trips,
+            COUNT(*) * 100 AS total_trips,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_distance), 2) AS avg_distance,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
             ROUND(AVG(tip_percentage), 2) AS avg_tip_percentage,
             ROUND(AVG(speed_mph), 2) AS avg_speed
         FROM taxi_trips
+        WHERE id % 100 = 0
         GROUP BY is_weekend
     """)
 

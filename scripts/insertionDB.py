@@ -11,13 +11,13 @@ from database import create_tables
 # Path to the cleaned data
 CLEANED_DATA_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "etl", "data", "processed", "yellow_2025_clean.parquet"
+    "..", "etl", "data", "processed", "yellow_2025_clean.parquet"
 )
 
 # Path to the zone lookup 
 ZONE_LOOKUP_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "etl", "data", "raw", "taxi_zone_lookup.csv"
+    "..", "etl", "data", "raw", "taxi_zone_lookup.csv"
 )
 
 BATCH_SIZE = 500_000
@@ -128,7 +128,6 @@ def insert_trips(conn):
             con=conn,
             if_exists="append",
             index=False,
-            method="multi"
         )
 
         total_inserted += len(df)
