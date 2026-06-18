@@ -89,11 +89,11 @@ def find_hourly_insights():
     query = """
         SELECT
             CAST(strftime('%H', pickup_datetime) AS INTEGER) AS hour,
-            COUNT(*) * 100 AS trip_count,
+            COUNT(*) * 10 AS trip_count,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration
         FROM taxi_trips
-        WHERE id % 100 = 0
+        WHERE id % 10 = 0
     """
     params = []
 
@@ -140,7 +140,7 @@ def find_borough_summary():
     query = """
         SELECT
             pu_borough AS borough,
-            COUNT(*) * 100 AS total_trips,
+            COUNT(*) * 10 AS total_trips,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_distance), 2) AS avg_distance,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
@@ -148,7 +148,7 @@ def find_borough_summary():
             ROUND(AVG(speed_mph), 2) AS avg_speed
         FROM taxi_trips
         WHERE pu_borough IS NOT NULL
-        AND id % 100 = 0
+        AND id % 10 = 0
     """
     params = []
 
@@ -186,9 +186,9 @@ def find_geojson():
 
         cursor.execute("""
             SELECT pu_location_id AS location_id,
-                   COUNT(*) * 100 AS trip_count
+                   COUNT(*) * 10 AS trip_count
             FROM taxi_trips
-            WHERE id % 100 = 0
+            WHERE id % 10 = 0
             GROUP BY pu_location_id
         """)
 
@@ -219,13 +219,13 @@ def find_summary_stats():
 
     cursor.execute("""
         SELECT
-            COUNT(*) * 100 AS total_trips,
+            COUNT(*) * 10 AS total_trips,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_distance), 2) AS avg_distance,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
             ROUND(AVG(speed_mph), 2) AS avg_speed
         FROM taxi_trips
-        WHERE id % 100 = 0
+        WHERE id % 10 = 0
     """)
 
     stats = dict(cursor.fetchone())
@@ -234,7 +234,7 @@ def find_summary_stats():
         SELECT CAST(strftime('%H', pickup_datetime) AS INTEGER) AS hour,
                COUNT(*) AS trip_count
         FROM taxi_trips
-        WHERE id % 100 = 0
+        WHERE id % 10 = 0
         GROUP BY hour
         ORDER BY trip_count DESC
         LIMIT 1
@@ -245,7 +245,7 @@ def find_summary_stats():
         SELECT pu_borough AS borough, COUNT(*) AS trip_count
         FROM taxi_trips
         WHERE pu_borough IS NOT NULL
-        AND id % 100 = 0
+        AND id % 10 = 0
         GROUP BY pu_borough
         ORDER BY trip_count DESC
         LIMIT 1
@@ -271,14 +271,14 @@ def find_weekend_vs_weekday():
                 WHEN 1 THEN 'Weekend'
                 ELSE 'Weekday'
             END AS day_type,
-            COUNT(*) * 100 AS total_trips,
+            COUNT(*) * 10 AS total_trips,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_distance), 2) AS avg_distance,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration,
             ROUND(AVG(tip_percentage), 2) AS avg_tip_percentage,
             ROUND(AVG(speed_mph), 2) AS avg_speed
         FROM taxi_trips
-        WHERE id % 100 = 0
+        WHERE id % 10 = 0
         GROUP BY is_weekend
     """)
 
