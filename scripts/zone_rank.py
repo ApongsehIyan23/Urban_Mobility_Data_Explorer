@@ -55,10 +55,10 @@ class MinHeap:
 
     def bubble_up(self, index):
         while index > 0:
-            parent = self._parent(index)
-            if self.zones[index][0] < self.zones[parent][0]:
-                self.swap(index, parent)
-                index = parent
+            parent_idx = self.parent(index)
+            if self.zones[index][0] < self.zones[parent_idx][0]:
+                self.swap(index, parent_idx)
+                index = parent_idx
             else:
                 break
 
@@ -117,6 +117,7 @@ def get_top_zones(k=15):
             pu_borough,
             COUNT(*) as trip_count
         FROM taxi_trips
+        WHERE id % 10 = 0
         GROUP BY pu_location_id, pu_zone, pu_borough
     """)
 
