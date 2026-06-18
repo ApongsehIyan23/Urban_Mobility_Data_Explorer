@@ -29,7 +29,7 @@ def create_sample():
     duckdb.execute(f"""
         COPY (
             SELECT * FROM read_parquet('{FULL_DATA}')
-            USING SAMPLE 5 PERCENT
+            USING SAMPLE 20 PERCENT
         ) TO '{SAMPLED_DATA}' (FORMAT PARQUET)
     """)
 
