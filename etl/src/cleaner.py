@@ -11,6 +11,174 @@ import multiprocessing
 from datetime import datetime
 
 
+
+#Funcion for multiprocessing
+def process_month(args: tuple) -> dict:
+    """
+    Processes a single monthly parquet file through the full
+    cleaning pipeline. Designed to run in a separate process.
+    Steps: Load, Fill Nulls, Clean/Exclude rows, add error messages,
+    engineer features, join zones, output results
+    Returns a dict containing: cleaned_df, excluded_df, and monthly stats for summary report.
+    """
+
+    filepath, zone_lookup_path, config = args
+
+    #config values
+    VALID_VENDORS = config["VALID_VENDORS"]
+    VALID_RATE_CODES = config["VALID_RATE_CODES"]
+    VALID_PAYMENT_TYPES = config["VALID_PAYMENT_TYPES"]
+    VALID_LOCATION_IDS  = config["VALID_LOCATION_IDS"]
+    VALID_PASSENGERS    = config["VALID_PASSENGERS"]
+    FREE_PAYMENT_TYPES  = config["FREE_PAYMENT_TYPES"]
+    FINANCIAL_COLS  = config["FINANCIAL_COLS"]
+    IMPUTE_MAP = config["IMPUTE_MAP"]
+    COLUMN_RENAME_MAP = config["COLUMN_RENAME_MAP"]
+    TRIP_KEY_COLS = config["TRIP_KEY_COLS"]
+
+    label = (
+        os.path.basename(filepath)
+        .replace("yellow_tripdata_", "")
+        .replace(".parquet", "")
+    )
+    print(f"  [{label}] Loading...")
+    df = pd.read_parquet(filepath)
+    df = df.rename(columns=COLUMN_RENAME_MAP) #rename columns
+    raw_count = len(df)
+
+    #check for duplicates based 5 key columns
+    renamed_key_cols = [COLUMN_RENAME_MAP.get(c, c) for c in TRIP_KEY_COLS]
+    duplicate_mask   = df.duplicated(subset=renamed_key_cols, keep="first")
+
+    #fill nulls
+    for col, default in IMPUTE_MAP.items():
+        if col in df.columns:
+            df[col] = df[col].fillna(default)
+    
+    free_trip = np.isin(df["payment_type"].values, list(FREE_PAYMENT_TYPES))
+
+    masks = {
+        "invalid_passenger_count": ~np.isin(df["passenger_count"].values, list(VALID_PASSENGERS)),
+        "out_of_range_timestamp": df["pickup_datetime"].dt.year.values != 2025,
+        "invalid_trip_duration":  df["dropoff_datetime"].values <= df["pickup_datetime"].values,
+        "invalid_distance": df["trip_distance"].values <= 0,
+        "distance_outlier": df["trip_distance"].values > 150,
+        "invalid_fare_amount": (df["fare_amount"].values <= 0) & ~free_trip,
+        "fare_outlier": df["fare_amount"].values > 500,
+        "invalid_total_amount": (df["total_amount"].values <= 0) & ~free_trip,
+        "invalid_vendor_id": ~np.isin(df["vendor_id"].values, list(VALID_VENDORS)),
+        "invalid_ratecode_id": ~np.isin(df["ratecode_id"].values, list(VALID_RATE_CODES)),
+        "invalid_pu_location": ~np.isin(df["pu_location_id"].values, list(VALID_LOCATION_IDS)),
+        "invalid_do_location": ~np.isin(df["do_location_id"].values, list(VALID_LOCATION_IDS)),
+        "invalid_payment_type": ~np.isin(df["payment_type"].values, list(VALID_PAYMENT_TYPES)),
+        "duplicate_record": duplicate_mask.values,
+    }
+
+
+    # Add negative financial column masks
+    for col in FINANCIAL_COLS:
+        if col in df.columns:
+            masks[f"negative_{col}"] = df[col].values < 0
+
+
+    combined_exclusion_mask = np.zeros(len(df), dtype=bool)
+    for mask in masks.values():
+        combined_exclusion_mask |= mask
+
+    clean_df    = df[~combined_exclusion_mask].copy()
+    excluded_df = df[combined_exclusion_mask].copy()
+    del df  # Free full DataFrame from memory immediately
+
+
+    excluded_index  = excluded_df.index
+    reason_series   = pd.Series([""] * len(excluded_df), index=excluded_index)
+
+    for reason_label, mask in masks.items():
+        # Align full mask to excluded subset only
+        subset_mask = mask[combined_exclusion_mask]
+        reason_series[subset_mask] = (
+            reason_series[subset_mask] + reason_label + "|"
+        )
+    
+    reason_series = reason_series.str.rstrip("|")
+    excluded_df["flag_reasons"] = reason_series.values
+    excluded_df["month"] = label
+
+    #Features
+    #trip duration in minutes
+    clean_df["trip_duration_minutes"] = (
+        (clean_df["dropoff_datetime"] - clean_df["pickup_datetime"])
+        .dt.total_seconds() / 60
+    ).round(2)
+    #fare per mile
+    clean_df["fare_per_mile"] = (
+        clean_df["fare_amount"] / clean_df["trip_distance"]
+    ).round(4)
+    #time of day category
+    hour = clean_df["pickup_datetime"].dt.hour
+    clean_df["time_of_day"] = "Night"
+    clean_df.loc[(hour >= 5)  & (hour < 12), "time_of_day"] = "Morning"
+    clean_df.loc[(hour >= 12) & (hour < 17), "time_of_day"] = "Afternoon"
+    clean_df.loc[(hour >= 17) & (hour < 21), "time_of_day"] = "Evening"
+
+    #Join zones
+    zone_lookup = pd.read_csv(zone_lookup_path)
+    lookup      = zone_lookup.rename(columns={
+        "LocationID":   "location_id",
+        "Borough":      "borough",
+        "Zone":         "zone",
+        "service_zone": "service_zone"
+    })
+
+    # Pickup join
+    clean_df = clean_df.merge(
+        lookup.rename(columns={
+            "location_id":  "pu_location_id",
+            "borough":      "pu_borough",
+            "zone":         "pu_zone",
+            "service_zone": "pu_service_zone"
+        }),
+        on="pu_location_id", how="left"
+    )
+
+    # Dropoff join
+    clean_df = clean_df.merge(
+        lookup.rename(columns={
+            "location_id":  "do_location_id",
+            "borough":      "do_borough",
+            "zone":         "do_zone",
+            "service_zone": "do_service_zone"
+        }),
+        on="do_location_id", how="left"
+    )
+
+    #exclusion breakdown
+    exclusion_breakdown = {}
+    for reason_label, mask in masks.items():
+        count = int(mask[combined_exclusion_mask].sum())
+        if count > 0:
+            exclusion_breakdown[reason_label] = count
+
+    stats = {
+        "month": label,
+        "raw_count": raw_count,
+        "clean_count": len(clean_df),
+        "excluded_count": len(excluded_df),
+        "exclusion_breakdown": exclusion_breakdown
+    }
+
+    print(f"  [{label}] Done — {len(clean_df):,} clean / {len(excluded_df):,} excluded")
+
+    return {
+        "clean_df": clean_df,
+        "excluded_df": excluded_df,
+        "stats": stats,
+        "label": label
+    }
+
+
+
+
 class TLCCleaner:
     """
     Cleans and transforms NYC Yellow Taxi 2025 trip data.
