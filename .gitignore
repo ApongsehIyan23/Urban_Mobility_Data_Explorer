@@ -1,0 +1,29 @@
+# Data files — too large for GitHub
+*.parquet
+*.csv
+*.db
+*.zip
+*.shp
+*.dbf
+*.shx
+*.prj
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+env/
+
+# Logs
+*.log
+*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# ETL data folder
+etl/data/
