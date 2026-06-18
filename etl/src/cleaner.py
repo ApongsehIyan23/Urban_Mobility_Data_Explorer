@@ -1,10 +1,13 @@
-import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
 import os
+import io
+import sys
+import numpy as np
 import pandas as pd
-from glob import glob
+import pyarrow as pa
+import pyarrow.parquet as pq
+import duckdb
+import glob as glob_module
+import multiprocessing
 from datetime import datetime
 
 
