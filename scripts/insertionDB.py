@@ -11,7 +11,7 @@ from database import create_tables
 # Path to the cleaned data
 CLEANED_DATA_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "..", "etl", "data", "processed", "yellow_2025_clean.parquet"
+    "data", "sampled_trips.parquet"
 )
 
 # Path to the zone lookup 
@@ -118,7 +118,6 @@ def insert_trips(conn):
     for batch in parquet_file.iter_batches(batch_size=BATCH_SIZE):
         batch_number += 1
         df = batch.to_pandas()
-        df = df.sample(frac=0.20, random_state=42)
 
         df = add_extra_features(df)
 
