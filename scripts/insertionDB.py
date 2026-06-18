@@ -118,6 +118,7 @@ def insert_trips(conn):
     for batch in parquet_file.iter_batches(batch_size=BATCH_SIZE):
         batch_number += 1
         df = batch.to_pandas()
+        df = df.sample(frac=0.20, random_state=42)
 
         df = add_extra_features(df)
 
