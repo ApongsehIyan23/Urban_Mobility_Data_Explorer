@@ -323,6 +323,51 @@ class TLCCleaner:
         print(f"  Deleted {len(monthly_clean_files)} monthly clean parquet files.")
         print(f"  Deleted {len(monthly_exclusion_files)} monthly exclusion CSV files.")
 
+    
+    def run_with_profiler(self):
+        """
+        Runs the full cleaning pipeline wrapped in cProfile.
+        Profiles every function call across all 12 months and
+        saves a detailed performance report to data/logs/profile_report.txt
+        """
+        import cProfile
+        import pstats
+        import io
+
+        print("Starting profiled pipeline run...")
+        print("All 12 months will be processed and profiled.")
+        print("=" * 60)
+
+        profiler = cProfile.Profile()
+        profiler.enable()
+
+        self.run()  # runs everything exactly as normal
+
+        profiler.disable()
+
+        # Sort by cumulative time and print top 30 to terminal
+        stream = io.StringIO()
+        stats  = pstats.Stats(profiler, stream=stream)
+        stats.strip_dirs()          # removes long file paths for readability
+        stats.sort_stats("cumulative")
+        stats.print_stats(30)
+
+        print("\n" + "=" * 60)
+        print("PROFILER REPORT — TOP 30 BOTTLENECKS BY CUMULATIVE TIME")
+        print("=" * 60)
+        print(stream.getvalue())
+
+        # Save full report with top 50 to logs
+        with open("data/logs/profile_report.txt", "w") as f:
+            stream2 = io.StringIO()
+            stats2  = pstats.Stats(profiler, stream=stream2)
+            stats2.strip_dirs()
+            stats2.sort_stats("cumulative")
+            stats2.print_stats(50)
+            f.write(stream2.getvalue())
+
+        print("Full profile report saved -> data/logs/profile_report.txt")
+
 
     def run(self):
         """
@@ -445,7 +490,7 @@ if __name__ == "__main__":
         processed_dir = "data/processed",
         log_dir       = "data/logs"
     )
-    cleaner.run()
+    cleaner.run_with_profiler()
 
 
     
