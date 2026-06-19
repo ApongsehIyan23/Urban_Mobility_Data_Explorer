@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Mobility Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+    <div class="brand">NYC <span class="accent">Mobility</span> Explorer</div>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn when active" onclick="show('when', this)">When</button>
+    <button class="tab-btn where"       onclick="show('where', this)">Where</button>
+    <button class="tab-btn money"       onclick="show('howmuch', this)">How Much</button>
+</div>
+
+<!-- WHEN -->
+<div class="section active" id="section-when">
+    <div class="hero hero-when">
+        <div class="hero-eyebrow">NYC Yellow Taxi &middot; January 2024</div>
+        <h1>When Does the<br>City Ride?</h1>
+        <p>Uncovering the hidden rhythm of New York City, hour by hour.</p>
+    </div>
+    <div class="content">
+        <div class="stat-row">
+            <div class="big-stat big-stat-when">
+                <div class="bs-label">Total Trips</div>
+                <div class="bs-value" id="sb-total">&mdash;</div>
+                <div class="bs-sub">January 2024</div>
+            </div>
+            <div class="big-stat big-stat-when">
+                <div class="bs-label">Peak Hour</div>
+                <div class="bs-value" id="sb-peak">&mdash;</div>
+                <div class="bs-sub">Highest trip volume</div>
+            </div>
+        </div>
+        <div class="sec-heading">Trip volume by hour</div>
+        <div class="viz-card">
+            <div class="viz-card-body">
+                <canvas id="c-fare"></canvas>
+            </div>
+        </div>
+        <div class="sec-heading">Trip records</div>
+        <div class="viz-card">
+            <div class="table-controls">
+                <span class="tc-label">Trips</span>
+                <select id="f-time" onchange="filterWhen()">
+                    <option value="all">All Times</option>
+                    <option value="morning">Morning</option>
+                    <option value="afternoon">Afternoon</option>
+                    <option value="evening">Evening</option>
+                    <option value="night">Night</option>
+                </select>
+            </div>
+            <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pickup Time</th><th>Borough</th><th>Duration</th><th>Fare</th><th>Time of Day</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-when"></tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WHERE -->
+<div class="section" id="section-where">
+    <div class="hero hero-where">
+        <div class="hero-eyebrow">NYC Yellow Taxi &middot; January 2024</div>
+        <h1>Where Does the<br>City Ride?</h1>
+        <p>Mapping urban movement across the five boroughs of New York City.</p>
+    </div>
+    <div class="content">
+        <div class="stat-row">
+            <div class="big-stat big-stat-where">
+                <div class="bs-label">Top Borough</div>
+                <div class="bs-value" id="sb-top-boro">&mdash;</div>
+                <div class="bs-sub">Most pickups in January</div>
+            </div>
+            <div class="big-stat big-stat-where">
+                <div class="bs-label">Avg Distance</div>
+                <div class="bs-value" id="sb-avg-dist">&mdash;</div>
+                <div class="bs-sub">Per trip</div>
+            </div>
+        </div>
+        <div class="sec-heading">Pickup activity map</div>
+        <div class="viz-card">
+            <div id="map"></div>
+        </div>
+        <div class="sec-heading">Trip records by borough</div>
+        <div class="viz-card">
+            <div class="table-controls">
+                <span class="tc-label">Trips</span>
+                <select id="f-borough" onchange="filterWhere()">
+                    <option value="all">All Boroughs</option>
+                    <option value="Manhattan">Manhattan</option>
+                    <option value="Brooklyn">Brooklyn</option>
+                    <option value="Queens">Queens</option>
+                    <option value="Bronx">Bronx</option>
+                    <option value="Staten Island">Staten Island</option>
+                </select>
+            </div>
+            <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pickup Time</th><th>Borough</th><th>Distance</th><th>Fare</th><th>Time of Day</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-where"></tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- HOW MUCH -->
+<div class="section" id="section-howmuch">
+    <div class="hero hero-money">
+        <div class="hero-eyebrow">NYC Yellow Taxi &middot; January 2024</div>
+        <h1>How Much Does<br>the City Pay?</h1>
+        <p>Breaking down fares, tips, and speed across all five boroughs.</p>
+    </div>
+    <div class="content">
+        <div class="stat-row">
+            <div class="big-stat big-stat-money">
+                <div class="bs-label">Average Fare</div>
+                <div class="bs-value" id="sb-avg-fare">&mdash;</div>
+                <div class="bs-sub">All trip types</div>
+            </div>
+            <div class="big-stat big-stat-money">
+                <div class="bs-label">Avg Speed</div>
+                <div class="bs-value" id="sb-avg-speed">&mdash;</div>
+                <div class="bs-sub">Across all trips</div>
+            </div>
+        </div>
+        <div class="sec-heading">Average fare by borough</div>
+        <div class="viz-card">
+            <div class="viz-card-body">
+                <canvas id="c-borough-fare"></canvas>
+            </div>
+        </div>
+        <div class="sec-heading">Trip records by fare</div>
+        <div class="viz-card">
+            <div class="table-controls">
+                <span class="tc-label">Trips</span>
+                <select id="f-fare" onchange="filterHowMuch()">
+                    <option value="all">All Fares</option>
+                    <option value="low">$0 &ndash; $10</option>
+                    <option value="mid">$10 &ndash; $25</option>
+                    <option value="high">$25 &ndash; $50</option>
+                    <option value="vhigh">$50+</option>
+                </select>
+            </div>
+            <div class="table-scroll">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pickup Time</th><th>Borough</th><th>Fare</th><th>Tip %</th><th>Distance</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-howmuch"></tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
