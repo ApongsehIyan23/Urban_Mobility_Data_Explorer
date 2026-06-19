@@ -189,7 +189,7 @@ async function initMap() {
 
     try {
         const [geoRes, topRes] = await Promise.all([
-            fetch('https://data.cityofnewyork.us/api/geospatial/d3c5-ddgc?method=export&type=GeoJSON'),
+            fetch('https://data.cityofnewyork.us/api/geospatial/755u-8jsi?method=export&type=GeoJSON')
             get('/api/insights/top-zones?k=263')
         ]);
 
