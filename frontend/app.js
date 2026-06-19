@@ -73,7 +73,7 @@ function renderWhenTable(data) {
 
 function filterWhen() {
     const p    = document.getElementById('f-time').value;
-    const data = p === 'all' ? _whenTrips : _whenTrips.filter(t => t.time_of_day === p);
+    const data = p === 'all' ? _whenTrips.filter(t => (t.time_of_day || '').toLowerCase() === p);
     renderWhenTable(data.length ? data : _whenTrips);
 }
 
