@@ -1,29 +1,18 @@
-# Data files — too large for GitHub
-*.parquet
-*.csv
-*.db
-*.zip
-*.shp
-*.dbf
-*.shx
-*.prj
+# Virtual environment
+venv/
 
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 
-# Virtual environment
-venv/
-env/
+# All data folders - raw downloads, processed output, logs
+data/
 
-# Logs
-*.log
-*.txt
+# Common data file types
+*.parquet
+*.csv
+*.json
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# ETL data folder
-etl/data/
+# Environment variables
+.env
