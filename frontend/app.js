@@ -110,7 +110,7 @@ function renderWhereTable(data) {
 
 function filterWhere() {
     const b    = document.getElementById('f-borough').value;
-    const data = b === 'all' ? _whereTrips : _whereTrips.filter(t => t.pu_borough === b);
+    const data = b === 'all' ?_whereTrips : _whereTrips.filter(t => (t.pu_borough || '').toLowerCase() ===b.toLowerCase());
     renderWhereTable(data.length ? data : _whereTrips);
 }
 
