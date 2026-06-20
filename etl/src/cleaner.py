@@ -106,20 +106,19 @@ def process_month(args: tuple) -> dict:
 
     #Features
     #trip duration in minutes
-    clean_df["trip_duration_minutes"] = (
-        (clean_df["dropoff_datetime"] - clean_df["pickup_datetime"])
-        .dt.total_seconds() / 60
-    ).round(2)
+    clean_df["trip_duration_minutes"] = ((clean_df["dropoff_datetime"] - clean_df["pickup_datetime"]).dt.total_seconds() / 60).round(2)
     #fare per mile
-    clean_df["fare_per_mile"] = (
-        clean_df["fare_amount"] / clean_df["trip_distance"]
-    ).round(4)
+    clean_df["fare_per_mile"] = ( clean_df["fare_amount"] / clean_df["trip_distance"]).round(4)
     #time of day category
     hour = clean_df["pickup_datetime"].dt.hour
     clean_df["time_of_day"] = "Night"
     clean_df.loc[(hour >= 5)  & (hour < 12), "time_of_day"] = "Morning"
     clean_df.loc[(hour >= 12) & (hour < 17), "time_of_day"] = "Afternoon"
     clean_df.loc[(hour >= 17) & (hour < 21), "time_of_day"] = "Evening"
+
+    clean_df["speed_mph"] = ( clean_df["trip_distance"] / (clean_df["trip_duration_minutes"] / 60) ).round(4)
+    clean_df["tip_percentage"] = ( clean_df["tip_amount"] / clean_df["fare_amount"] * 100 ).round(4)
+    clean_df["is_weekend"] = clean_df["pickup_datetime"].dt.dayofweek.isin([5, 6]).astype(int)
 
     #Join zones
     zone_lookup = pd.read_csv(zone_lookup_path)
@@ -183,8 +182,7 @@ class TLCCleaner:
     """
     Orchestrates the full NYC Yellow Taxi 2025 ETL cleaning pipeline.
     Uses multiprocessing to process months in parallel and PyArrow
-    ParquetWriter to append results directly to final output files
-    without intermediate files or a separate DuckDB merge step.
+    ParquetWriter to append results directly to final output files/
     """
 
     # CONSTANTS
@@ -280,7 +278,6 @@ class TLCCleaner:
         ):
             print(f"    {reason:<40} {count:>10,}")
 
-    #save cleaning summary
     def _save_cleaning_summary(self):
         """Writes full year cleaning quality report to logs."""
         path          = os.path.join(self.log_dir, "cleaning_summary.txt")
@@ -334,8 +331,6 @@ class TLCCleaner:
         print(f"  Cleaning summary saved -> {path}")
 
     
-    #for testing purposes
-
     def run_with_profiler(self):
         """
         Runs the full pipeline wrapped in cProfile.
@@ -373,7 +368,6 @@ class TLCCleaner:
 
         print("Full profile report saved -> data/logs/profile_report.txt")
 
-    #to execute the full cleaning pipeline
 
     def run(self):
         """
