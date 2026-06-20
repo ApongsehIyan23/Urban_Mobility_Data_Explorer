@@ -57,8 +57,9 @@ async function loadWhen() {
         fareChart.data.labels = hourly.map(h => h.hour + ':00');
         fareChart.data.datasets[0].data = hourly.map(h => h.trip_count);
         fareChart.data.datasets[0].backgroundColor = hourly.map(h =>
-            h.hour === s.busiest_hour ? '#FF6B35' : 'rgba(255,107,53,0.2)'
+            'rgba(45,106,159,0.55)'
         );
+        fareChart.data.datasets[1].data = hourly.map(h => h.avg_speed != null ? Number(h.avg_speed.toFixed(1)) : null);
         fareChart.update();
     } catch(e) {
         console.warn('Hourly:', e.message);
@@ -250,17 +251,49 @@ async function initMap() {
 
 /* ── Charts (start empty — all data comes from API) ── */
 fareChart = new Chart(document.getElementById('c-fare'), {
-    type: 'bar',
     data: {
         labels: [],
-        datasets: [{ data: [], backgroundColor: [], borderRadius: 4 }]
+        datasets: [
+            {
+                type: 'bar',
+                label: 'Trips',
+                data: [],
+                backgroundColor: [],
+                borderRadius: 4,
+                yAxisID: 'yTrips',
+                order: 2
+            },
+            {
+                type: 'line',
+                label: 'Avg speed (mph)',
+                data: [],
+                borderColor: '#1e3a5f',
+                backgroundColor: '#1e3a5f',
+                pointBackgroundColor: '#1e3a5f',
+                pointRadius: 3,
+                tension: 0.35,
+                yAxisID: 'ySpeed',
+                order: 1
+            }
+        ]
     },
     options: {
         responsive: true,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 14, color: '#374151', font: { size: 12, weight: '600' } } } },
         scales: {
-            x: { ticks: { color: '#9ca3af', maxTicksLimit: 12 }, grid: { display: false } },
-            y: { ticks: { color: '#9ca3af', callback: v => v.toLocaleString() }, grid: { color: '#f9fafb' } }
+            x: { ticks: { color: '#9ca3af', maxTicksLimit: 12 }, grid: { display: true, color: '#dbeafe' } },
+            yTrips: {
+                position: 'left',
+                ticks: { color: '#9ca3af', callback: v => v.toLocaleString() },
+                grid: { color: '#dbeafe' },
+                title: { display: true, text: 'Trips', color: '#9ca3af' }
+            },
+            ySpeed: {
+                position: 'right',
+                ticks: { color: '#9ca3af', callback: v => v + ' mph' },
+                grid: { display: false },
+                title: { display: true, text: 'Avg speed (mph)', color: '#9ca3af' }
+            }
         }
     }
 });

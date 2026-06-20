@@ -6,7 +6,7 @@ from flask_cors import CORS
 from zone_rank import get_top_zones
 
 app = Flask(__name__)
-CORS(app, origin="*")  # Allow all origins for simplicity
+CORS(app, origins="*")
 
 UMD_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
