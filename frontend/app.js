@@ -260,7 +260,7 @@ fareChart = new Chart(document.getElementById('c-fare'), {
         plugins: { legend: { display: false } },
         scales: {
             x: { ticks: { color: '#9ca3af', maxTicksLimit: 12 }, grid: { display: false } },
-            y: { ticks: { color: '#9ca3af', callback: v => (v/1000).toFixed(0) + 'k' }, grid: { color: '#f9fafb' } }
+            y: { ticks: { color: '#9ca3af', callback: v => v.toLocaleString() }, grid: { color: '#f9fafb' } }
         }
     }
 });
