@@ -12,9 +12,22 @@ function show(name, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('section-' + name).classList.add('active');
     btn.classList.add('active');
-    if (name === 'where') initMap();
-    fareChart.resize();
-    boroughFareChart.resize();
+
+    // Resize charts after the section is visible
+    setTimeout(() => {
+        if (fareChart) fareChart.resize();
+        if (boroughFareChart) boroughFareChart.resize();
+    }, 50);
+
+    // Lazy-init map and reload data for the active section
+    if (name === 'where') {
+        initMap();
+        loadWhere();
+    } else if (name === 'when') {
+        loadWhen();
+    } else if (name === 'howmuch') {
+        loadHowMuch();
+    }
 }
 
 /* ── API helper ── */
@@ -73,7 +86,9 @@ function renderWhenTable(data) {
 
 function filterWhen() {
     const p    = document.getElementById('f-time').value;
-    const data = p === 'all' ? _whenTrips.filter(t => (t.time_of_day || '').toLowerCase() === p);
+    const data = p === 'all'
+        ? _whenTrips
+        : _whenTrips.filter(t => (t.time_of_day || '').toLowerCase() === p);
     renderWhenTable(data.length ? data : _whenTrips);
 }
 
@@ -110,7 +125,7 @@ function renderWhereTable(data) {
 
 function filterWhere() {
     const b    = document.getElementById('f-borough').value;
-    const data = b === 'all' ?_whereTrips : _whereTrips.filter(t => (t.pu_borough || '').toLowerCase() ===b.toLowerCase());
+    const data = b === 'all' ? _whereTrips : _whereTrips.filter(t => (t.pu_borough || '').toLowerCase() === b.toLowerCase());
     renderWhereTable(data.length ? data : _whereTrips);
 }
 
@@ -189,8 +204,8 @@ async function initMap() {
 
     try {
         const [geoRes, topRes] = await Promise.all([
-            fetch('https://data.cityofnewyork.us/api/geospatial/755u-8jsi?method=export&type=GeoJSON')
-            get('/api/top-zones?n=50')
+            fetch('https://data.cityofnewyork.us/api/geospatial/755u-8jsi?method=export&type=GeoJSON'),
+            get('/api/insights/top-zones?k=50')
         ]);
 
         const geojson  = await geoRes.json();
@@ -271,6 +286,5 @@ boroughFareChart = new Chart(document.getElementById('c-borough-fare'), {
 });
 
 /* ── Init ── */
+// Only load the default active section on startup; other sections load on tab click
 loadWhen();
-loadWhere();
-loadHowMuch();
