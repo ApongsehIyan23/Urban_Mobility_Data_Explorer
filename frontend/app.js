@@ -5,6 +5,7 @@ let fareChart, boroughFareChart;
 let _whenTrips  = [];
 let _whereTrips = [];
 let _howTrips   = [];
+let _allZones   = [];
 
 /* ── Navigation ── */
 function show(name, btn) {
@@ -72,6 +73,27 @@ async function loadWhen() {
     } catch(e) {
         console.warn('Trips (when):', e.message);
     }
+
+    try {
+        const wkRes = await get('/api/insights/weekend-vs-weekday');
+        renderWeekendComparison(wkRes.data || []);
+    } catch(e) {
+        console.warn('Weekend/weekday:', e.message);
+    }
+}
+
+function renderWeekendComparison(data) {
+    document.getElementById('wknd-comparison').innerHTML = data.map(d => `
+        <div class="wknd-card">
+            <div class="wknd-label">${d.day_type}</div>
+            <div class="wknd-trips">${Number(d.total_trips).toLocaleString()}</div>
+            <div class="wknd-meta">total trips</div>
+            <div class="wknd-stats">
+                <span>Avg fare <b>$${d.avg_fare}</b></span>
+                <span>Avg speed <b>${d.avg_speed} mph</b></span>
+                <span>Avg tip <b>${d.avg_tip_percentage}%</b></span>
+            </div>
+        </div>`).join('');
 }
 
 function renderWhenTable(data) {
@@ -116,6 +138,46 @@ async function loadWhere() {
     } catch(e) {
         console.warn('Trips (where):', e.message);
     }
+
+    try {
+        const zonesRes = await get('/api/zones');
+        _allZones = zonesRes.data || [];
+        populateZoneSelect('all');
+    } catch(e) {
+        console.warn('Zones:', e.message);
+    }
+
+    try {
+        const topRes = await get('/api/insights/top-zones?k=10');
+        renderTopZones(topRes.data || []);
+    } catch(e) {
+        console.warn('Top zones:', e.message);
+    }
+}
+
+function populateZoneSelect(borough) {
+    const sel   = document.getElementById('f-zone');
+    const zones = borough === 'all'
+        ? _allZones
+        : _allZones.filter(z => z.borough === borough);
+    sel.innerHTML = '<option value="all">All Zones</option>' +
+        zones.map(z => `<option value="${z.zone_name}">${z.zone_name}</option>`).join('');
+}
+
+function renderTopZones(data) {
+    document.getElementById('tbody-top-zones').innerHTML = data.map((z, i) => `
+        <tr>
+            <td class="muted">${i + 1}</td>
+            <td><b>${z.zone}</b></td>
+            <td class="muted">${z.borough}</td>
+            <td class="fare-where">${(z.trip_count || 0).toLocaleString()}</td>
+        </tr>`).join('');
+}
+
+function onBoroughChange() {
+    const b = document.getElementById('f-borough').value;
+    populateZoneSelect(b);
+    filterWhere();
 }
 
 function renderWhereTable(data) {
@@ -131,16 +193,19 @@ function renderWhereTable(data) {
 
 function filterWhere() {
     const b  = document.getElementById('f-borough').value;
+    const z  = document.getElementById('f-zone').value;
     const q  = (document.getElementById('s-where').value || '').toLowerCase().trim();
     let data = _whereTrips;
     if (b !== 'all') data = data.filter(t => (t.pu_borough || '').toLowerCase() === b.toLowerCase());
+    if (z !== 'all') data = data.filter(t => (t.pu_zone || '') === z);
     if (q) data = data.filter(t =>
         (t.pu_borough   || '').toLowerCase().includes(q) ||
         (t.pu_zone      || '').toLowerCase().includes(q) ||
         (t.time_of_day  || '').toLowerCase().includes(q) ||
         (t.pickup_datetime || '').includes(q)
     );
-    renderWhereTable(data.length ? data : (q || b !== 'all' ? [] : _whereTrips));
+    const active = q || b !== 'all' || z !== 'all';
+    renderWhereTable(data.length ? data : (active ? [] : _whereTrips));
 }
 
 /* ── HOW MUCH ── */

@@ -46,6 +46,10 @@
                 <canvas id="c-fare"></canvas>
             </div>
         </div>
+        <div class="sec-heading">Weekday vs Weekend</div>
+        <div class="viz-card">
+            <div class="wknd-grid" id="wknd-comparison"></div>
+        </div>
         <div class="sec-heading">Trip records</div>
         <div class="viz-card">
             <div class="table-controls">
@@ -99,19 +103,31 @@
         <div class="viz-card">
             <div id="map"></div>
         </div>
+        <div class="sec-heading">Top pickup zones</div>
+        <div class="viz-card">
+            <div class="table-scroll">
+            <table>
+                <thead><tr><th>#</th><th>Zone</th><th>Borough</th><th>Trips</th></tr></thead>
+                <tbody id="tbody-top-zones"></tbody>
+            </table>
+            </div>
+        </div>
         <div class="sec-heading">Trip records by borough</div>
         <div class="viz-card">
             <div class="table-controls">
                 <span class="tc-label">Trips</span>
                 <div class="tc-right">
                     <input class="search-input" id="s-where" type="text" placeholder="Search borough, zone…" oninput="filterWhere()">
-                    <select id="f-borough" onchange="filterWhere()">
+                    <select id="f-borough" onchange="onBoroughChange()">
                         <option value="all">All Boroughs</option>
                         <option value="Manhattan">Manhattan</option>
                         <option value="Brooklyn">Brooklyn</option>
                         <option value="Queens">Queens</option>
                         <option value="Bronx">Bronx</option>
                         <option value="Staten Island">Staten Island</option>
+                    </select>
+                    <select id="f-zone" onchange="filterWhere()">
+                        <option value="all">All Zones</option>
                     </select>
                 </div>
             </div>
