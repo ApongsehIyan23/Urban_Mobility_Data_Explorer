@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-import duckdb
 import glob as glob_module
 import multiprocessing
 from datetime import datetime
@@ -498,10 +497,11 @@ if __name__ == "__main__":
     # Required on Windows for multiprocessing
     multiprocessing.freeze_support()
 
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     cleaner = TLCCleaner(
-        data_dir      = "data/raw",
-        processed_dir = "data/processed",
-        log_dir       = "data/logs"
+        data_dir      = os.path.join(BASE_DIR, "data", "raw"),
+        processed_dir = os.path.join(BASE_DIR, "data", "processed"),
+        log_dir       = os.path.join(BASE_DIR, "data", "logs")
     )
     cleaner.run_with_profiler()
 
