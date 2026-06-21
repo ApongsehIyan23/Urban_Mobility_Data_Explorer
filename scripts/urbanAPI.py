@@ -92,6 +92,7 @@ def find_hourly_insights():
             COUNT(*) * 10 AS trip_count,
             ROUND(AVG(fare_amount), 2) AS avg_fare,
             ROUND(AVG(trip_duration_minutes), 2) AS avg_duration
+            ROUND(AVG(speed_mph), 2) AS avg_speed
         FROM taxi_trips
         WHERE id % 10 = 0
     """
