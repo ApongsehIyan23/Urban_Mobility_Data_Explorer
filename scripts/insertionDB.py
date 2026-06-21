@@ -1,167 +1,165 @@
 import os
-import sys
+import sqlite3
+import multiprocessing
 import pandas as pd
 import pyarrow.parquet as pq
 
-# Add path so as to  import database.py
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database import open_connection, create_tables, create_indexes
 
-from database import create_tables
 
-# Path to the cleaned data
 CLEANED_DATA_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "data", "sampled_trips.parquet"
+    "..", "etl", "data", "processed", "yellow_2025_clean.parquet"
 )
 
-# Path to the zone lookup 
 ZONE_LOOKUP_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..", "etl", "data", "raw", "taxi_zone_lookup.csv"
 )
 
-BATCH_SIZE = 500_000
+DB_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "data", "mobility.db"
+)
+
+#increased batch size to 1M and added workers to 4 for multiprocessing
+BATCH_SIZE  = 1_000_000
+MAX_WORKERS = min(4, os.cpu_count() or 1)
 
 
-def add_extra_features(df):
-    
-    df["speed_mph"] = (
-        df["trip_distance"] / (df["trip_duration_minutes"] / 60)
-    ).round(4)
-    df["speed_mph"] = df["speed_mph"].where(df["trip_duration_minutes"] > 0)
+COLUMNS_TO_INSERT = [
+    "vendor_id",
+    "pickup_datetime",
+    "dropoff_datetime",
+    "passenger_count",
+    "trip_distance",
+    "ratecode_id",
+    "pu_location_id",
+    "do_location_id",
+    "payment_type",
+    "fare_amount",
+    "tip_amount",
+    "tolls_amount",
+    "total_amount",
+    "congestion_surcharge",
+    "airport_fee",
+    "cbd_congestion_fee",
+    "trip_duration_minutes",
+    "fare_per_mile",
+    "speed_mph",
+    "tip_percentage",
+    "time_of_day",
+    "is_weekend",
+]
 
-    df["tip_percentage"] = (
-        df["tip_amount"] / df["fare_amount"] * 100
-    ).round(4)
-    df["tip_percentage"] = df["tip_percentage"].where(df["fare_amount"] > 0)
 
-    df["pickup_datetime"] = pd.to_datetime(df["pickup_datetime"])
-    df["is_weekend"] = df["pickup_datetime"].dt.dayofweek.isin([5, 6]).astype(int)
 
-    df["pickup_datetime"] = df["pickup_datetime"].dt.strftime("%Y-%m-%d %H:%M:%S")
-
+def process_batch(batch) -> pd.DataFrame:
+    """
+    converts a pyarrow batch to a pandas dataframe
+    """
+    df = batch.to_pandas()
+    df = df[COLUMNS_TO_INSERT]
     return df
 
-#reads and inserts zones 
-def insert_zones(conn):
 
+def insert_zones(conn: sqlite3.Connection):
+    """ Zone Insertion """
     print("Inserting zones...")
 
     zone_df = pd.read_csv(ZONE_LOOKUP_PATH)
-
     zone_df = zone_df.rename(columns={
         "LocationID":   "location_id",
         "Borough":      "borough",
         "Zone":         "zone_name",
         "service_zone": "service_zone"
     })
-
     zone_df = zone_df[["location_id", "borough", "zone_name", "service_zone"]]
 
-    cursor = conn.cursor()
-
-    for _, row in zone_df.iterrows():
-        cursor.execute("""
-            INSERT OR IGNORE INTO taxi_zones
-            (location_id, borough, zone_name, service_zone)
-            VALUES (?, ?, ?, ?)
-        """, (
-            int(row["location_id"]),
-            str(row["borough"]),
-            str(row["zone_name"]),
-            str(row["service_zone"])
-        ))
-
-    conn.commit()
-    print(f"Zones inserted successfully — {len(zone_df)} zones loaded.")
-
-# reads and insert trips 
-def insert_trips(conn):
-    print("Inserting trips in batches...")
-    print(f"Batch size: {BATCH_SIZE:,} rows per batch")
-
-    parquet_file = pq.ParquetFile(CLEANED_DATA_PATH)
-
-    COLUMNS_TO_INSERT = [
-        "vendor_id",
-        "pickup_datetime",
-        "dropoff_datetime",
-        "passenger_count",
-        "trip_distance",
-        "ratecode_id",
-        "pu_location_id",
-        "do_location_id",
-        "payment_type",
-        "fare_amount",
-        "tip_amount",
-        "tolls_amount",
-        "total_amount",
-        "congestion_surcharge",
-        "airport_fee",
-        "pu_borough",
-        "pu_zone",
-        "pu_service_zone",
-        "do_borough",
-        "do_zone",
-        "do_service_zone",
-        "trip_duration_minutes",
-        "fare_per_mile",
-        "time_of_day",
-        "speed_mph",
-        "tip_percentage",
-        "is_weekend"
+    records = [
+        (int(row.location_id), str(row.borough),
+         str(row.zone_name), str(row.service_zone))
+        for row in zone_df.itertuples(index=False)
     ]
 
-    batch_number = 0
+    conn.cursor().executemany("""
+        INSERT OR IGNORE INTO taxi_zones
+        (location_id, borough, zone_name, service_zone)
+        VALUES (?, ?, ?, ?)
+    """, records)
+
+    conn.commit()
+    print(f"Zones inserted successfully - {len(records)} zones loaded.")
+
+
+
+def insert_trips(conn: sqlite3.Connection):
+    """
+    Inserts all 34M cleaned trip records from the clean parquet file.
+    """
+    print("Inserting trips...")
+    print(f"Batch size:  {BATCH_SIZE:,} rows")
+    print(f"Workers:     {MAX_WORKERS}")
+
+    conn.execute("PRAGMA synchronous = OFF")
+
+    parquet_file  = pq.ParquetFile(CLEANED_DATA_PATH)
+    batches       = list(parquet_file.iter_batches(batch_size=BATCH_SIZE))
+    total_batches = len(batches)
     total_inserted = 0
 
-    for batch in parquet_file.iter_batches(batch_size=BATCH_SIZE):
-        batch_number += 1
-        df = batch.to_pandas()
+    print(f"Total batches to process: {total_batches}")
 
-        df = add_extra_features(df)
+    with multiprocessing.Pool(processes=MAX_WORKERS) as pool:
+        for batch_number, df in enumerate(
+            pool.imap(process_batch, batches), start=1
+        ):
+            # Explicit transaction per batch
+            df.to_sql(
+                name      = "taxi_trips",
+                con       = conn,
+                if_exists = "append",
+                index     = False,
+            )
 
-        df = df[COLUMNS_TO_INSERT]
+            total_inserted += len(df)
+            print(
+                f"Batch {batch_number}/{total_batches} inserted "
+                f"- {total_inserted:,} rows so far")
+            del df
 
-        df.to_sql(
-            name="taxi_trips",
-            con=conn,
-            if_exists="append",
-            index=False,
-        )
-
-        total_inserted += len(df)
-        print(f"Batch {batch_number} inserted — {total_inserted:,} rows so far")
-
-        del df
-
-    print(f"\nAll trips inserted successfully — {total_inserted:,} total rows.")
+    # Restore safe synchronous mode after bulk load
+    conn.execute("PRAGMA synchronous = NORMAL")
+    print(f"\nAll trips inserted successfully - {total_inserted:,} total rows.")
 
 
 def run_insertion():
-   
-    print("Urban Mobility Database — Insertion Pipeline")
+    print("Urban Mobility Database - Insertion Pipeline")
     print("=" * 50)
 
     create_tables()
 
-    import sqlite3
-    raw_conn = sqlite3.connect(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "mobility.db")
-)
+    conn = open_connection()
+    insert_zones(conn)
+    insert_trips(conn)
 
-    insert_zones(raw_conn)
+    # Step 5 — Update SQLite query planner statistics
+    print("Running ANALYZE...")
+    conn.execute("ANALYZE")
+    conn.commit()
+    print("ANALYZE complete.")
 
-    insert_trips(raw_conn)
+    conn.close()
 
-    print("Optimizing database...")
-    raw_conn.execute("ANALYZE")
-    raw_conn.commit()
-    print("Database optimized.")
+    # Step 6 — Build indexes after all data is loaded
+   
+    print("Building indexes...")
+    create_indexes()
 
-    raw_conn.close()
     print("=" * 50)
     print("Insertion pipeline complete.")
 
+
 if __name__ == "__main__":
+    multiprocessing.freeze_support()  # required on Windows
     run_insertion()

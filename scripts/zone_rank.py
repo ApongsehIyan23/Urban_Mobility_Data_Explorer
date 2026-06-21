@@ -105,47 +105,42 @@ class MinHeap:
         return result
 
 
-def get_top_zones(k=15):
-    
-    conn = sqlite3.connect(UMD_PATH)
-    cursor = conn.cursor()
+def get_top_zones(k=15, conn=None):
+    close_after = False
+    if conn is None:
+        from database import open_connection
+        conn        = open_connection()
+        close_after = True
 
+    cursor = conn.cursor()
     cursor.execute("""
         SELECT
-            pu_location_id,
-            pu_zone,
-            pu_borough,
-            COUNT(*) as trip_count
-        FROM taxi_trips
-        WHERE id % 10 = 0
-        GROUP BY pu_location_id, pu_zone, pu_borough
+            t.pu_location_id  AS location_id,
+            z.zone_name       AS zone_name,
+            z.borough         AS borough,
+            COUNT(*)          AS trip_count
+        FROM taxi_trips t
+        JOIN taxi_zones z ON t.pu_location_id = z.location_id
+        GROUP BY t.pu_location_id, z.zone_name, z.borough
     """)
-
     rows = cursor.fetchall()
-    conn.close()
-
+    if close_after:
+        conn.close()
     heap = MinHeap(k)
-
     for row in rows:
-        location_id = row[0]
-        zone_name   = row[1]
-        borough     = row[2]
-        trip_count  = row[3]
-
-        heap.add(trip_count, location_id, zone_name, borough)
+        heap.add(row["trip_count"], row["location_id"],
+                 row["zone_name"], row["borough"])
 
     sorted_results = heap.get_sorted()
-
-    results = []
-    for item in sorted_results:
-        results.append({
+    return [
+        {
             "trip_count":  item[0],
             "location_id": item[1],
             "zone":        item[2],
             "borough":     item[3]
-        })
-
-    return results
+        }
+        for item in sorted_results
+    ]
 
 if __name__ == "__main__":
     print("Top 15 Busiest NYC Taxi Pickup Zones")
