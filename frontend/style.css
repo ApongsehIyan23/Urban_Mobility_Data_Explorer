@@ -207,9 +207,9 @@ body {
 .tc-label { font-size: 14px; font-weight: 700; color: #111827; }
 
 .tc-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+     display: flex;
+     align-items: center;
+     gap: 10px;
 }
 
 .search-input {
@@ -223,8 +223,8 @@ body {
     outline: none;
     width: 200px;
     transition: border-color 0.15s, background 0.15s;
-}
-
+    }
+    
 .search-input:focus {
     border-color: var(--navy);
     background: #fff;
