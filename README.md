@@ -44,32 +44,59 @@ This application processes the full year of 2025 NYC Yellow Taxi trip data — 3
 ## Project Structure
 
 Urban_Mobility_Data_Explorer/
+
 ├── etl/
+
 │   ├── data/
-│   │   ├── raw/                         ← downloaded data files go here
-│   │   ├── processed/                   ← cleaned parquet output
-│   │   └── logs/                        ← cleaning logs and exclusion reports
+
+│   │   ├── raw/                      ← downloaded data files go here
+
+│   │   ├── processed/                ← cleaned parquet output
+
+│   │   └── logs/                     ← cleaning logs and exclusion reports
+
 │   ├── src/
-│   │   └── cleaner.py                   ← 14-rule data cleaning pipeline
-│   ├── download_trip_data.sh            ← downloads all data files
+
+│   │   └── cleaner.py                ← 14-rule data cleaning pipeline
+
+│   ├── download_trip_data.sh         ← downloads all data files
+
 │   └── requirements.txt
+
 ├── scripts/
+
 │   ├── data/
-│   │   └── mobility.db                  ← generated SQLite database
-│   ├── database.py                      ← database schema, connection and indexes
-│   ├── insertionDB.py                   ← multiprocessing batch insertion pipeline
-│   ├── compute_summaries.py             ← pre-computes 8 summary tables from parquet
-│   ├── convert_geojs.py                 ← shapefile to GeoJSON conversion
-│   ├── urbanAPI.py                      ← Flask REST API with 10 endpoints
-│   └── zone_rank.py                     ← custom MinHeap algorithm
+
+│   │   └── mobility.db               ← generated SQLite database
+
+│   ├── database.py                   ← database schema and connection
+
+│   ├── insertionDB.py                ← multiprocessing batch insertion
+
+│   ├── compute_summaries.py          ← pre-computes 8 summary tables
+
+│   ├── convert_geojs.py              ← shapefile to GeoJSON conversion
+
+│   ├── urbanAPI.py                   ← Flask REST API with 10 endpoints
+
+│   └── zone_rank.py                  ← custom MinHeap algorithm
+
 ├── frontend/
-│   ├── index.html                       ← dashboard structure
-│   ├── style.css                        ← styling and responsive layout
-│   └── app.js                           ← chart and map logic
+
+│   ├── index.html
+
+│   ├── style.css
+
+│   └── app.js
+
 ├── docs/
-│   ├── architecture_diagram.png         ← system architecture diagram
-│   └── Technical_Report.pdf            ← technical documentation
+
+│   ├── architecture_diagram.png
+
+│   └── Technical_Report.pdf
+
 ├── .gitignore
+
 ├── README.md
 
 
