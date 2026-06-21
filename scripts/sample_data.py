@@ -19,7 +19,7 @@ SAMPLED_DATA = os.path.join(
 
 
 def create_sample():
-    print("Creating 5% sample of cleaned data...")
+    print("Creating 18% sample of cleaned data...")
 
     total = duckdb.execute(
         f"SELECT COUNT(*) FROM read_parquet('{FULL_DATA}')"
@@ -29,7 +29,7 @@ def create_sample():
     duckdb.execute(f"""
         COPY (
             SELECT * FROM read_parquet('{FULL_DATA}')
-            USING SAMPLE 5 PERCENT
+            USING SAMPLE 18 PERCENT
         ) TO '{SAMPLED_DATA}' (FORMAT PARQUET)
     """)
 
