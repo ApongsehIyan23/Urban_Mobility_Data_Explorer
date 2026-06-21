@@ -206,6 +206,32 @@ body {
 
 .tc-label { font-size: 14px; font-weight: 700; color: #111827; }
 
+.tc-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-input {
+    padding: 8px 14px;
+    border-radius: 100px;
+    border: 1.5px solid #e5e7eb;
+    background: #f9fafb;
+    color: #374151;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    width: 200px;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.search-input:focus {
+    border-color: var(--navy);
+    background: #fff;
+}
+
+.search-input::placeholder { color: #9ca3af; }
+
 .table-controls select {
     padding: 8px 18px;
     border-radius: 100px;

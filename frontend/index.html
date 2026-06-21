@@ -50,13 +50,16 @@
         <div class="viz-card">
             <div class="table-controls">
                 <span class="tc-label">Trips</span>
-                <select id="f-time" onchange="filterWhen()">
-                    <option value="all">All Times</option>
-                    <option value="morning">Morning</option>
-                    <option value="afternoon">Afternoon</option>
-                    <option value="evening">Evening</option>
-                    <option value="night">Night</option>
-                </select>
+                <div class="tc-right">
+                    <input class="search-input" id="s-when" type="text" placeholder="Search borough, time…" oninput="filterWhen()">
+                    <select id="f-time" onchange="filterWhen()">
+                        <option value="all">All Times</option>
+                        <option value="morning">Morning</option>
+                        <option value="afternoon">Afternoon</option>
+                        <option value="evening">Evening</option>
+                        <option value="night">Night</option>
+                    </select>
+                </div>
             </div>
             <div class="table-scroll">
             <table>
@@ -100,14 +103,17 @@
         <div class="viz-card">
             <div class="table-controls">
                 <span class="tc-label">Trips</span>
-                <select id="f-borough" onchange="filterWhere()">
-                    <option value="all">All Boroughs</option>
-                    <option value="Manhattan">Manhattan</option>
-                    <option value="Brooklyn">Brooklyn</option>
-                    <option value="Queens">Queens</option>
-                    <option value="Bronx">Bronx</option>
-                    <option value="Staten Island">Staten Island</option>
-                </select>
+                <div class="tc-right">
+                    <input class="search-input" id="s-where" type="text" placeholder="Search borough, zone…" oninput="filterWhere()">
+                    <select id="f-borough" onchange="filterWhere()">
+                        <option value="all">All Boroughs</option>
+                        <option value="Manhattan">Manhattan</option>
+                        <option value="Brooklyn">Brooklyn</option>
+                        <option value="Queens">Queens</option>
+                        <option value="Bronx">Bronx</option>
+                        <option value="Staten Island">Staten Island</option>
+                    </select>
+                </div>
             </div>
             <div class="table-scroll">
             <table>
@@ -153,13 +159,16 @@
         <div class="viz-card">
             <div class="table-controls">
                 <span class="tc-label">Trips</span>
-                <select id="f-fare" onchange="filterHowMuch()">
-                    <option value="all">All Fares</option>
-                    <option value="low">$0 &ndash; $10</option>
-                    <option value="mid">$10 &ndash; $25</option>
-                    <option value="high">$25 &ndash; $50</option>
-                    <option value="vhigh">$50+</option>
-                </select>
+                <div class="tc-right">
+                    <input class="search-input" id="s-howmuch" type="text" placeholder="Search borough…" oninput="filterHowMuch()">
+                    <select id="f-fare" onchange="filterHowMuch()">
+                        <option value="all">All Fares</option>
+                        <option value="low">$0 &ndash; $10</option>
+                        <option value="mid">$10 &ndash; $25</option>
+                        <option value="high">$25 &ndash; $50</option>
+                        <option value="vhigh">$50+</option>
+                    </select>
+                </div>
             </div>
             <div class="table-scroll">
             <table>

@@ -86,11 +86,16 @@ function renderWhenTable(data) {
 }
 
 function filterWhen() {
-    const p    = document.getElementById('f-time').value;
-    const data = p === 'all'
-        ? _whenTrips
-        : _whenTrips.filter(t => (t.time_of_day || '').toLowerCase() === p);
-    renderWhenTable(data.length ? data : _whenTrips);
+    const p   = document.getElementById('f-time').value;
+    const q   = (document.getElementById('s-when').value || '').toLowerCase().trim();
+    let data  = _whenTrips;
+    if (p !== 'all') data = data.filter(t => (t.time_of_day || '').toLowerCase() === p);
+    if (q) data = data.filter(t =>
+        (t.pu_borough   || '').toLowerCase().includes(q) ||
+        (t.time_of_day  || '').toLowerCase().includes(q) ||
+        (t.pickup_datetime || '').includes(q)
+    );
+    renderWhenTable(data.length ? data : (q || p !== 'all' ? [] : _whenTrips));
 }
 
 /* ── WHERE ── */
@@ -125,9 +130,17 @@ function renderWhereTable(data) {
 }
 
 function filterWhere() {
-    const b    = document.getElementById('f-borough').value;
-    const data = b === 'all' ? _whereTrips : _whereTrips.filter(t => (t.pu_borough || '').toLowerCase() === b.toLowerCase());
-    renderWhereTable(data.length ? data : _whereTrips);
+    const b  = document.getElementById('f-borough').value;
+    const q  = (document.getElementById('s-where').value || '').toLowerCase().trim();
+    let data = _whereTrips;
+    if (b !== 'all') data = data.filter(t => (t.pu_borough || '').toLowerCase() === b.toLowerCase());
+    if (q) data = data.filter(t =>
+        (t.pu_borough   || '').toLowerCase().includes(q) ||
+        (t.pu_zone      || '').toLowerCase().includes(q) ||
+        (t.time_of_day  || '').toLowerCase().includes(q) ||
+        (t.pickup_datetime || '').includes(q)
+    );
+    renderWhereTable(data.length ? data : (q || b !== 'all' ? [] : _whereTrips));
 }
 
 /* ── HOW MUCH ── */
@@ -172,8 +185,9 @@ function renderHowMuchTable(data) {
 }
 
 function filterHowMuch() {
-    const f    = document.getElementById('f-fare').value;
-    const data = _howTrips.filter(t => {
+    const f  = document.getElementById('f-fare').value;
+    const q  = (document.getElementById('s-howmuch').value || '').toLowerCase().trim();
+    let data = _howTrips.filter(t => {
         const v = t.fare_amount || 0;
         return f === 'all'
             || (f === 'low'   && v <= 10)
@@ -181,7 +195,12 @@ function filterHowMuch() {
             || (f === 'high'  && v > 25 && v <= 50)
             || (f === 'vhigh' && v > 50);
     });
-    renderHowMuchTable(data.length ? data : _howTrips);
+    if (q) data = data.filter(t =>
+        (t.pu_borough  || '').toLowerCase().includes(q) ||
+        (t.time_of_day || '').toLowerCase().includes(q) ||
+        (t.pickup_datetime || '').includes(q)
+    );
+    renderHowMuchTable(data.length ? data : (q || f !== 'all' ? [] : _howTrips));
 }
 
 /* ── Map (lazy init) ── */
