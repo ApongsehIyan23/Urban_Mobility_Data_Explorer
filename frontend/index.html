@@ -9,193 +9,197 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <div class="topbar">
     <div class="brand">NYC <span class="accent">Mobility</span> Explorer</div>
 </div>
 
-<div class="tab-bar">
-    <button class="tab-btn when active" onclick="show('when', this)">When</button>
-    <button class="tab-btn where"       onclick="show('where', this)">Where</button>
-    <button class="tab-btn money"       onclick="show('howmuch', this)">How Much</button>
+<!-- STICKY KPI STRIP -->
+<div class="kpi-strip">
+    <div class="kpi-card">
+        <div class="kpi-label">Total Trips</div>
+        <div class="kpi-value" id="kpi-trips">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value" id="kpi-revenue">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Avg Fare</div>
+        <div class="kpi-value" id="kpi-fare">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Avg Duration</div>
+        <div class="kpi-value" id="kpi-duration">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Avg Speed</div>
+        <div class="kpi-value" id="kpi-speed">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Peak Hour</div>
+        <div class="kpi-value" id="kpi-hour">—</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Top Borough</div>
+        <div class="kpi-value" id="kpi-borough">—</div>
+    </div>
 </div>
 
-<!-- WHEN -->
-<div class="section active" id="section-when">
-    <div class="hero hero-when">
-        <div class="hero-eyebrow">NYC Yellow Taxi &middot; January – December 2025</div>
-        <h1>When Does the<br>City Ride?</h1>
-        <p>Uncovering the hidden rhythm of New York City, hour by hour.</p>
+<!-- FILTER BAR -->
+<div class="filter-bar">
+    <div class="filter-bar-inner">
+        <span class="filter-label">Filter</span>
+        <select id="g-borough">
+            <option value="">All Boroughs</option>
+            <option value="Manhattan">Manhattan</option>
+            <option value="Brooklyn">Brooklyn</option>
+            <option value="Queens">Queens</option>
+            <option value="Bronx">Bronx</option>
+            <option value="Staten Island">Staten Island</option>
+            <option value="EWR">EWR</option>
+        </select>
+        <select id="g-timeofday">
+            <option value="">All Times</option>
+            <option value="Morning">Morning</option>
+            <option value="Afternoon">Afternoon</option>
+            <option value="Evening">Evening</option>
+            <option value="Night">Night</option>
+        </select>
+        <button class="apply-btn" id="apply-btn" onclick="applyGlobalFilters()">Apply Filters</button>
+        <button class="reset-btn" id="reset-btn" onclick="resetGlobalFilters()">✕ Reset</button>
     </div>
+    <div class="filter-status" id="filter-status" style="display:none;">
+        <span id="filter-status-text"></span>
+    </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+    <div class="hero-eyebrow">NYC Yellow Taxi &middot; January – December 2025</div>
+    <h1>How New York City<br>Moved in 2025</h1>
+    <p>Uncovering the hidden rhythm of 33.8 million taxi trips — hour by hour, borough by borough.</p>
+</div>
+
+<!-- WHEN DOES NYC MOVE? -->
+<div class="page-section">
     <div class="content">
-        <div class="stat-row">
-            <div class="big-stat big-stat-when">
-                <div class="bs-label">Total Trips</div>
-                <div class="bs-value" id="sb-total">&mdash;</div>
-                <div class="bs-sub">January – December 2025</div>
-            </div>
-            <div class="big-stat big-stat-when">
-                <div class="bs-label">Peak Hour</div>
-                <div class="bs-value" id="sb-peak">&mdash;</div>
-                <div class="bs-sub">Highest trip volume</div>
-            </div>
-        </div>
-        <div class="sec-heading">Demand &amp; speed by hour of day</div>
+        <div class="section-title">When Does NYC Move?</div>
+        <div class="section-sub" id="sub-hourly">Trip volume and average speed across every hour of the day</div>
+
         <div class="viz-card">
             <div class="viz-card-body">
-                <canvas id="c-fare"></canvas>
+                <canvas id="c-hourly"></canvas>
             </div>
         </div>
-        <div class="sec-heading">Weekday vs Weekend</div>
+
+        <div class="section-sub" id="sub-radar" style="margin-top: 32px;">Weekday vs Weekend — how the city moves differently</div>
+<div class="wknd-stat-row">
+    <div class="wknd-stat-card">
+        <div class="wknd-stat-label">Weekday Trips</div>
+        <div class="wknd-stat-value" id="wknd-trips-weekday">—</div>
+    </div>
+    <div class="wknd-stat-card">
+        <div class="wknd-stat-label">Weekend Trips</div>
+        <div class="wknd-stat-value" id="wknd-trips-weekend">—</div>
+    </div>
+    <div class="wknd-insight" id="wknd-insight-text">—</div>
+</div>
         <div class="viz-card">
-            <div class="wknd-grid" id="wknd-comparison"></div>
-        </div>
-        <div class="sec-heading">Trip records</div>
-        <div class="viz-card">
-            <div class="table-controls">
-                <span class="tc-label">Trips</span>
-                <div class="tc-right">
-                    <input class="search-input" id="s-when" type="text" placeholder="Search borough, time…" oninput="filterWhen()">
-                    <select id="f-time" onchange="filterWhen()">
-                        <option value="all">All Times</option>
-                        <option value="morning">Morning</option>
-                        <option value="afternoon">Afternoon</option>
-                        <option value="evening">Evening</option>
-                        <option value="night">Night</option>
-                    </select>
-                </div>
-            </div>
-            <div class="table-scroll">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Pickup Time</th><th>Borough</th><th>Duration</th><th>Fare</th><th>Time of Day</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-when"></tbody>
-            </table>
+            <div class="viz-card-body">
+                <canvas id="c-radar"></canvas>
             </div>
         </div>
     </div>
 </div>
 
-<!-- WHERE -->
-<div class="section" id="section-where">
-    <div class="hero hero-where">
-        <div class="hero-eyebrow">NYC Yellow Taxi &middot; January – December 2025</div>
-        <h1>Where Does the<br>City Ride?</h1>
-        <p>Mapping urban movement across the five boroughs of New York City.</p>
-    </div>
+<!-- WHERE DOES NYC MOVE? -->
+<div class="page-section">
     <div class="content">
-        <div class="stat-row">
-            <div class="big-stat big-stat-where">
-                <div class="bs-label">Top Borough</div>
-                <div class="bs-value" id="sb-top-boro">&mdash;</div>
-                <div class="bs-sub">Most pickups in 2025</div>
-            </div>
-            <div class="big-stat big-stat-where">
-                <div class="bs-label">Avg Distance</div>
-                <div class="bs-value" id="sb-avg-dist">&mdash;</div>
-                <div class="bs-sub">Per trip</div>
-            </div>
-        </div>
-        <div class="sec-heading">Pickup activity map</div>
+        <div class="section-title">Where Does NYC Move?</div>
+        <div class="section-sub" id="sub-map">Mapping pickup activity across all 263 NYC taxi zones</div>
+
         <div class="viz-card">
             <div id="map"></div>
         </div>
-        <div class="sec-heading">Top pickup zones</div>
+        <div class="insight-box" id="map-insight">Loading map insight…</div>
+
+        <div class="section-sub" id="sub-polar" style="margin-top: 32px;">Top 15 busiest pickup zones</div>
         <div class="viz-card">
-            <div class="table-scroll">
-            <table>
-                <thead><tr><th>#</th><th>Zone</th><th>Borough</th><th>Trips</th></tr></thead>
-                <tbody id="tbody-top-zones"></tbody>
-            </table>
+            <div class="viz-card-body">
+                <canvas id="c-polar"></canvas>
             </div>
         </div>
-        <div class="sec-heading">Trip records by borough</div>
+        <div class="insight-box" id="polar-insight">Loading zones insight…</div>
+
+        <div class="section-sub" id="sub-borough-doughnut" style="margin-top: 32px;">Trip share by borough</div>
         <div class="viz-card">
-            <div class="table-controls">
-                <span class="tc-label">Trips</span>
-                <div class="tc-right">
-                    <input class="search-input" id="s-where" type="text" placeholder="Search borough, zone…" oninput="filterWhere()">
-                    <select id="f-borough" onchange="onBoroughChange()">
-                        <option value="all">All Boroughs</option>
-                        <option value="Manhattan">Manhattan</option>
-                        <option value="Brooklyn">Brooklyn</option>
-                        <option value="Queens">Queens</option>
-                        <option value="Bronx">Bronx</option>
-                        <option value="Staten Island">Staten Island</option>
-                    </select>
-                    <select id="f-zone" onchange="filterWhere()">
-                        <option value="all">All Zones</option>
-                    </select>
-                </div>
-            </div>
-            <div class="table-scroll">
-            <table>
-                <thead>
-                    <tr>
-                         <th>Pickup Time</th><th>Borough</th><th>Distance</th><th>Fare</th><th>Time of Day</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-where"></tbody>
-            </table>
+            <div class="viz-card-body" style="max-width: 400px; margin: 0 auto;">
+                <canvas id="c-borough-doughnut"></canvas>
             </div>
         </div>
+        <div class="insight-box" id="borough-doughnut-insight">Loading borough insight…</div>
     </div>
 </div>
 
-<!-- HOW MUCH -->
-<div class="section" id="section-howmuch">
-    <div class="hero hero-money">
-        <div class="hero-eyebrow">NYC Yellow Taxi &middot; January – December 2025</div>
-        <h1>How Much Does<br>the City Pay?</h1>
-        <p>Breaking down fares, tips, and speed across all five boroughs.</p>
-    </div>
+<!-- HOW MUCH DOES NYC PAY? -->
+<div class="page-section">
     <div class="content">
-        <div class="stat-row">
-            <div class="big-stat big-stat-money">
-                <div class="bs-label">Average Fare</div>
-                <div class="bs-value" id="sb-avg-fare">&mdash;</div>
-                <div class="bs-sub">All trip types</div>
-            </div>
-            <div class="big-stat big-stat-money">
-                <div class="bs-label">Avg Speed</div>
-                <div class="bs-value" id="sb-avg-speed">&mdash;</div>
-                <div class="bs-sub">Across all trips</div>
-            </div>
-        </div>
-        <div class="sec-heading">Average fare by borough</div>
+        <div class="section-title">How Much Does NYC Pay?</div>
+        <div class="section-sub">Breaking down fares and payment methods across all 33.8 million trips</div>
+
+        <div class="section-sub" id="sub-fare-dist" style="margin-top: 16px;">Fare distribution across all trips</div>
         <div class="viz-card">
             <div class="viz-card-body">
-                <canvas id="c-borough-fare"></canvas>
+                <canvas id="c-fare-dist"></canvas>
             </div>
         </div>
-        <div class="sec-heading">Trip records by fare</div>
+        <div class="insight-box" id="fare-dist-insight">Loading fare insight…</div>
+
+        <div class="section-sub" id="sub-payment" style="margin-top: 32px;">How passengers prefer to pay</div>
         <div class="viz-card">
-            <div class="table-controls">
-                <span class="tc-label">Trips</span>
-                <div class="tc-right">
-                    <input class="search-input" id="s-howmuch" type="text" placeholder="Search borough…" oninput="filterHowMuch()">
-                    <select id="f-fare" onchange="filterHowMuch()">
-                        <option value="all">All Fares</option>
-                        <option value="low">$0 &ndash; $10</option>
-                        <option value="mid">$10 &ndash; $25</option>
-                        <option value="high">$25 &ndash; $50</option>
-                        <option value="vhigh">$50+</option>
-                    </select>
-                </div>
+            <div class="viz-card-body" style="max-width: 400px; margin: 0 auto;">
+                <canvas id="c-payment"></canvas>
             </div>
+        </div>
+        <div class="insight-box" id="payment-insight">Loading payment insight…</div>
+    </div>
+</div>
+
+<!-- EXPLORE THE DATA -->
+<div class="page-section">
+    <div class="content">
+        <div class="section-title">Explore the Data</div>
+        <div class="section-sub">Filter and browse individual trip records from the full 2025 dataset</div>
+
+        <div class="filter-panel">
+            <input id="f-hour-explore" type="number" min="0" max="23" placeholder="Hour (0-23)" oninput="resetAndLoad()">
+            <span class="filter-count" id="trip-count-label">Showing — trips</span>
+        </div>
+
+        <div class="viz-card">
             <div class="table-scroll">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Pickup Time</th><th>Borough</th><th>Fare</th><th>Tip %</th><th>Distance</th>
-                    </tr>
-                </thead>
-                <tbody id="tbody-howmuch"></tbody>
-            </table>
+                <table id="trips-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-col="pickup_datetime">Pickup Time <span class="sort-icon">▲</span></th>
+                            <th>Borough</th>
+                            <th>Zone</th>
+                            <th class="sortable" data-col="trip_duration_minutes">Duration <span class="sort-icon"></span></th>
+                            <th class="sortable" data-col="trip_distance">Distance <span class="sort-icon"></span></th>
+                            <th class="sortable" data-col="fare_amount">Fare <span class="sort-icon"></span></th>
+                            <th class="sortable" data-col="tip_percentage">Tip % <span class="sort-icon"></span></th>
+                            <th>Payment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-explore"></tbody>
+                </table>
             </div>
+        </div>
+
+        <div class="pagination">
+            <button id="btn-prev" onclick="prevPage()" disabled>← Prev</button>
+            <span id="page-label">Page 1</span>
+            <button id="btn-next" onclick="nextPage()">Next →</button>
         </div>
     </div>
 </div>
