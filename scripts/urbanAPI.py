@@ -57,7 +57,10 @@ def find_trips():
     hour, err = parse_int_param(request.args.get("hour"), "hour", min_val=0, max_val=23)
     if err: return err
 
-    limit, err = parse_int_param(request.args.get("limit"), "limit", default=500, min_val=1, max_val=5000)
+    limit, err = parse_int_param(request.args.get("limit"), "limit", default=50, min_val=1, max_val=200)
+    if err: return err
+
+    offset, err = parse_int_param(request.args.get("offset"), "offset", default=0, min_val=0)
     if err: return err
 
     query = """
@@ -88,15 +91,23 @@ def find_trips():
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    query += " LIMIT ?"
+    query += " LIMIT ? OFFSET ?"
     params.append(limit)
+    params.append(offset)
 
     conn   = open_connection()
     cursor = conn.cursor()
     cursor.execute(query, params)
     trips  = [dict(row) for row in cursor.fetchall()]
     conn.close()
-    return jsonify({"status": "success", "count": len(trips), "data": trips})
+
+    return jsonify({
+        "status": "success",
+        "count":  len(trips),
+        "offset": offset,
+        "limit":  limit,
+        "data":   trips
+    })
 
 
 
@@ -147,14 +158,20 @@ def find_hourly_insights():
 
 @app.route("/api/insights/top-zones", methods=["GET"])
 def find_top_pickup_zones():
-    conn      = open_connection()
-    top_zones = get_top_zones(k=15, conn=conn)
+    conn   = open_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT rank, location_id, zone_name AS zone, borough, trip_count
+        FROM summary_top_zones
+        ORDER BY rank
+    """)
+    data = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify({
         "status":    "success",
         "algorithm": "MinHeap O(n log k)",
-        "count":     len(top_zones),
-        "data":      top_zones
+        "count":     len(data),
+        "data":      data
     })
 
 
@@ -366,4 +383,4 @@ def find_fare_distribution():
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    app.run(debug=False, port=5000, threaded=True)
