@@ -178,17 +178,27 @@ def combine_partials(partial_results: list, zone_lookup: dict) -> dict:
             "avg_speed":    round(b["sum_speed"]    / n, 2),
         })
 
-    # ---- Top 15 zones ----
-    sorted_zones = sorted(zone_acc.items(), key=lambda x: -x[1]["count"])[:15]
-    top_zones = []
-    for rank, (loc, z) in enumerate(sorted_zones, start=1):
+    # ---- Top 15 zones — MinHeap O(n log k) ----
+    from zone_rank import MinHeap
+
+    heap = MinHeap(k=15)
+    for loc, z in zone_acc.items():
         info = zone_lookup.get(loc, {})
+        heap.add(
+            int(z["count"]),
+            loc,
+            info.get("zone_name", "Unknown"),
+            info.get("borough",   "Unknown")
+        )
+
+    top_zones = []
+    for rank, item in enumerate(heap.get_sorted(), start=1):
         top_zones.append({
             "rank":        rank,
-            "location_id": loc,
-            "zone_name":   info.get("zone_name", "Unknown"),
-            "borough":     info.get("borough",   "Unknown"),
-            "trip_count":  int(z["count"]),
+            "location_id": item[1],
+            "zone_name":   item[2],
+            "borough":     item[3],
+            "trip_count":  item[0],
         })
 
     # ---- Hourly summary ----
