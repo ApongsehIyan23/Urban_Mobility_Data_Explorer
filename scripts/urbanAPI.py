@@ -1,10 +1,11 @@
 import json
 import os
+import copy
 import sqlite3
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from database import open_connection, UMD_PATH
-from zone_rank import get_top_zones
+from zone_rank import get_top_zones, MinHeap
 
 app = Flask(__name__)
 CORS(app, origins="*")
@@ -20,6 +21,7 @@ try:
 except FileNotFoundError:
     GEOJSON_CACHE = None
 
+
 def parse_int_param(value, name, default=None, min_val=None, max_val=None):
     if value is None:
         return default, None
@@ -33,6 +35,20 @@ def parse_int_param(value, name, default=None, min_val=None, max_val=None):
     except ValueError:
         return None, (jsonify({"status": "error", "message": f"'{name}' must be a valid integer"}), 400)
 
+
+def build_conditions(borough, time_of_day, hour=None):
+    conditions = []
+    params     = []
+    if borough:
+        conditions.append("pu.borough = ?")
+        params.append(borough)
+    if time_of_day:
+        conditions.append("t.time_of_day = ?")
+        params.append(time_of_day)
+    if hour is not None:
+        conditions.append("CAST(strftime('%H', t.pickup_datetime) AS INTEGER) = ?")
+        params.append(hour)
+    return conditions, params
 
 
 @app.route("/api/zones", methods=["GET"])
@@ -54,14 +70,14 @@ def find_trips():
     borough     = request.args.get("borough")
     time_of_day = request.args.get("time_of_day")
 
-    hour, err = parse_int_param(request.args.get("hour"), "hour", min_val=0, max_val=23)
+    hour,   err = parse_int_param(request.args.get("hour"),   "hour",   min_val=0, max_val=23)
     if err: return err
-
-    limit, err = parse_int_param(request.args.get("limit"), "limit", default=50, min_val=1, max_val=200)
+    limit,  err = parse_int_param(request.args.get("limit"),  "limit",  default=50, min_val=1, max_val=200)
     if err: return err
-
     offset, err = parse_int_param(request.args.get("offset"), "offset", default=0, min_val=0)
     if err: return err
+
+    conditions, params = build_conditions(borough, time_of_day, hour)
 
     query = """
         SELECT
@@ -76,24 +92,10 @@ def find_trips():
         JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
         JOIN taxi_zones do ON t.do_location_id = do.location_id
     """
-    params     = []
-    conditions = []
-
-    if borough:
-        conditions.append("pu.borough = ?")
-        params.append(borough)
-    if hour is not None:
-        conditions.append("CAST(strftime('%H', t.pickup_datetime) AS INTEGER) = ?")
-        params.append(hour)
-    if time_of_day:
-        conditions.append("t.time_of_day = ?")
-        params.append(time_of_day)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
-
     query += " LIMIT ? OFFSET ?"
-    params.append(limit)
-    params.append(offset)
+    params += [limit, offset]
 
     conn   = open_connection()
     cursor = conn.cursor()
@@ -101,14 +103,7 @@ def find_trips():
     trips  = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    return jsonify({
-        "status": "success",
-        "count":  len(trips),
-        "offset": offset,
-        "limit":  limit,
-        "data":   trips
-    })
-
+    return jsonify({"status": "success", "count": len(trips), "offset": offset, "limit": limit, "data": trips})
 
 
 @app.route("/api/insights/hourly", methods=["GET"])
@@ -124,28 +119,19 @@ def find_hourly_insights():
         conn.close()
         return jsonify({"status": "success", "data": data})
 
+    conditions, params = build_conditions(borough, time_of_day)
     query = """
         SELECT
             CAST(strftime('%H', t.pickup_datetime) AS INTEGER) AS hour,
-            COUNT(*)                             AS trip_count,
-            ROUND(AVG(t.fare_amount), 2)         AS avg_fare,
+            COUNT(*)                               AS trip_count,
+            ROUND(AVG(t.fare_amount), 2)           AS avg_fare,
             ROUND(AVG(t.trip_duration_minutes), 2) AS avg_duration,
-            ROUND(AVG(t.speed_mph), 2)           AS avg_speed
+            ROUND(AVG(t.speed_mph), 2)             AS avg_speed
         FROM taxi_trips t
         JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
     """
-    params     = []
-    conditions = []
-
-    if borough:
-        conditions.append("pu.borough = ?")
-        params.append(borough)
-    if time_of_day:
-        conditions.append("t.time_of_day = ?")
-        params.append(time_of_day)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
-
     query += " GROUP BY hour ORDER BY hour"
 
     conn   = open_connection()
@@ -158,21 +144,56 @@ def find_hourly_insights():
 
 @app.route("/api/insights/top-zones", methods=["GET"])
 def find_top_pickup_zones():
+    borough     = request.args.get("borough")
+    time_of_day = request.args.get("time_of_day")
+
+    if not borough and not time_of_day:
+        conn   = open_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT rank, location_id, zone_name AS zone, borough, trip_count
+            FROM summary_top_zones ORDER BY rank
+        """)
+        data = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({"status": "success", "algorithm": "MinHeap O(n log k)", "count": len(data), "data": data})
+
+    conditions, params = build_conditions(borough, time_of_day)
+    query = """
+        SELECT
+            t.pu_location_id   AS location_id,
+            z.zone_name        AS zone_name,
+            z.borough          AS borough,
+            COUNT(*)           AS trip_count
+        FROM taxi_trips t
+        JOIN taxi_zones z  ON t.pu_location_id = z.location_id
+        JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
+    """
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " GROUP BY t.pu_location_id, z.zone_name, z.borough"
+
     conn   = open_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT rank, location_id, zone_name AS zone, borough, trip_count
-        FROM summary_top_zones
-        ORDER BY rank
-    """)
-    data = [dict(row) for row in cursor.fetchall()]
+    cursor.execute(query, params)
+    rows   = cursor.fetchall()
     conn.close()
-    return jsonify({
-        "status":    "success",
-        "algorithm": "MinHeap O(n log k)",
-        "count":     len(data),
-        "data":      data
-    })
+
+    heap = MinHeap(k=15)
+    for row in rows:
+        heap.add(row["trip_count"], row["location_id"], row["zone_name"], row["borough"])
+
+    data = []
+    for rank, item in enumerate(heap.get_sorted(), start=1):
+        data.append({
+            "rank":        rank,
+            "trip_count":  item[0],
+            "location_id": item[1],
+            "zone":        item[2],
+            "borough":     item[3]
+        })
+
+    return jsonify({"status": "success", "algorithm": "MinHeap O(n log k)", "count": len(data), "data": data})
 
 
 @app.route("/api/insights/borough-summary", methods=["GET"])
@@ -191,6 +212,7 @@ def find_borough_summary():
         conn.close()
         return jsonify({"status": "success", "data": data})
 
+    conditions, params = build_conditions(borough, time_of_day, hour)
     query = """
         SELECT
             pu.borough                              AS borough,
@@ -203,21 +225,8 @@ def find_borough_summary():
         FROM taxi_trips t
         JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
     """
-    params     = []
-    conditions = []
-
-    if borough:
-        conditions.append("pu.borough = ?")
-        params.append(borough)
-    if hour is not None:
-        conditions.append("CAST(strftime('%H', t.pickup_datetime) AS INTEGER) = ?")
-        params.append(hour)
-    if time_of_day:
-        conditions.append("t.time_of_day = ?")
-        params.append(time_of_day)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
-
     query += " GROUP BY pu.borough ORDER BY total_trips DESC"
 
     conn   = open_connection()
@@ -233,13 +242,29 @@ def find_geojson():
     if GEOJSON_CACHE is None:
         return jsonify({"error": "GeoJSON file not found"}), 404
 
-    try:
-        import copy
+    borough     = request.args.get("borough")
+    time_of_day = request.args.get("time_of_day")
 
+    try:
         conn   = open_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT location_id, trip_count FROM summary_zone_counts")
-        trip_counts = {row["location_id"]: row["trip_count"] for row in cursor.fetchall()}
+
+        if not borough and not time_of_day:
+            cursor.execute("SELECT location_id, trip_count FROM summary_zone_counts")
+            trip_counts = {row["location_id"]: row["trip_count"] for row in cursor.fetchall()}
+        else:
+            conditions, params = build_conditions(borough, time_of_day)
+            query = """
+                SELECT pu_location_id AS location_id, COUNT(*) AS trip_count
+                FROM taxi_trips t
+                JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
+            """
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += " GROUP BY pu_location_id"
+            cursor.execute(query, params)
+            trip_counts = {row["location_id"]: row["trip_count"] for row in cursor.fetchall()}
+
         conn.close()
 
         geojson = copy.deepcopy(GEOJSON_CACHE)
@@ -251,8 +276,6 @@ def find_geojson():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
 
 
 @app.route("/api/stats/summary", methods=["GET"])
@@ -271,6 +294,7 @@ def find_summary_stats():
         conn.close()
         return jsonify({"status": "success", "data": data})
 
+    conditions, params = build_conditions(borough, time_of_day, hour)
     query = """
         SELECT
             COUNT(*)                               AS total_trips,
@@ -282,18 +306,6 @@ def find_summary_stats():
         FROM taxi_trips t
         JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
     """
-    params     = []
-    conditions = []
-
-    if borough:
-        conditions.append("pu.borough = ?")
-        params.append(borough)
-    if hour is not None:
-        conditions.append("CAST(strftime('%H', t.pickup_datetime) AS INTEGER) = ?")
-        params.append(hour)
-    if time_of_day:
-        conditions.append("t.time_of_day = ?")
-        params.append(time_of_day)
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
@@ -302,84 +314,171 @@ def find_summary_stats():
     cursor.execute(query, params)
     data = dict(cursor.fetchone())
 
-    cursor.execute("""
-        SELECT CAST(strftime('%H', t.pickup_datetime) AS INTEGER) AS hour,
-               COUNT(*) AS trip_count
+    busiest_query = """
+        SELECT CAST(strftime('%H', t.pickup_datetime) AS INTEGER) AS hour, COUNT(*) AS trip_count
         FROM taxi_trips t
         JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
-        WHERE """ + " AND ".join(conditions) + """
-        GROUP BY hour ORDER BY trip_count DESC LIMIT 1
-    """, params) if conditions else cursor.execute("""
-        SELECT CAST(strftime('%H', pickup_datetime) AS INTEGER) AS hour,
-               COUNT(*) AS trip_count
-        FROM taxi_trips
-        GROUP BY hour ORDER BY trip_count DESC LIMIT 1
-    """)
+    """
+    if conditions:
+        busiest_query += " WHERE " + " AND ".join(conditions)
+    busiest_query += " GROUP BY hour ORDER BY trip_count DESC LIMIT 1"
+    cursor.execute(busiest_query, params)
     data["busiest_hour"] = cursor.fetchone()["hour"]
 
-    cursor.execute("""
+    borough_query = """
         SELECT pu.borough, COUNT(*) AS trip_count
         FROM taxi_trips t
         JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
-        """ + ("WHERE " + " AND ".join(conditions) if conditions else "") + """
-        GROUP BY pu.borough ORDER BY trip_count DESC LIMIT 1
-    """, params)
+    """
+    if conditions:
+        borough_query += " WHERE " + " AND ".join(conditions)
+    borough_query += " GROUP BY pu.borough ORDER BY trip_count DESC LIMIT 1"
+    cursor.execute(borough_query, params)
     data["busiest_borough"] = cursor.fetchone()["borough"]
 
     conn.close()
     return jsonify({"status": "success", "data": data})
 
 
-
 @app.route("/api/insights/weekend-vs-weekday", methods=["GET"])
 def find_weekend_vs_weekday():
+    borough     = request.args.get("borough")
+    time_of_day = request.args.get("time_of_day")
+
+    if not borough and not time_of_day:
+        conn   = open_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM summary_weekend_weekday")
+        data = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({"status": "success", "data": data})
+
+    conditions, params = build_conditions(borough, time_of_day)
+    query = """
+        SELECT
+            CASE is_weekend WHEN 1 THEN 'Weekend' ELSE 'Weekday' END AS day_type,
+            COUNT(*)                               AS total_trips,
+            ROUND(AVG(t.fare_amount), 2)           AS avg_fare,
+            ROUND(AVG(t.trip_distance), 2)         AS avg_distance,
+            ROUND(AVG(t.trip_duration_minutes), 2) AS avg_duration,
+            ROUND(AVG(t.tip_percentage), 2)        AS avg_tip_pct,
+            ROUND(AVG(t.speed_mph), 2)             AS avg_speed
+        FROM taxi_trips t
+        JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
+    """
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " GROUP BY is_weekend"
+
     conn   = open_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM summary_weekend_weekday")
-    data = [dict(row) for row in cursor.fetchall()]
+    cursor.execute(query, params)
+    data   = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify({"status": "success", "data": data})
-
 
 
 @app.route("/api/insights/payment-breakdown", methods=["GET"])
 def find_payment_breakdown():
+    borough     = request.args.get("borough")
+    time_of_day = request.args.get("time_of_day")
+
+    if not borough and not time_of_day:
+        conn   = open_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT payment_type, label, trip_count, percentage
+            FROM summary_payment_breakdown
+            ORDER BY trip_count DESC
+        """)
+        data = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({"status": "success", "data": data})
+
+    conditions, params = build_conditions(borough, time_of_day)
+    query = """
+        SELECT
+            t.payment_type,
+            COUNT(*) AS trip_count,
+            ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS percentage
+        FROM taxi_trips t
+        JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
+    """
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " GROUP BY t.payment_type ORDER BY trip_count DESC"
+
     conn   = open_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT payment_type, label, trip_count, percentage
-        FROM summary_payment_breakdown
-        ORDER BY trip_count DESC
-    """)
-    data = [dict(row) for row in cursor.fetchall()]
+    cursor.execute(query, params)
+    rows   = cursor.fetchall()
     conn.close()
-    return jsonify({"status": "success", "data": data})
 
+    payment_labels = {0:"Flex Fare", 1:"Credit Card", 2:"Cash", 3:"No Charge", 4:"Dispute", 5:"Unknown", 6:"Voided Trip"}
+    data = [{"payment_type": r["payment_type"], "label": payment_labels.get(r["payment_type"], "Unknown"),
+             "trip_count": r["trip_count"], "percentage": r["percentage"]} for r in rows]
+
+    return jsonify({"status": "success", "data": data})
 
 
 @app.route("/api/insights/fare-distribution", methods=["GET"])
 def find_fare_distribution():
+    borough     = request.args.get("borough")
+    time_of_day = request.args.get("time_of_day")
+
+    if not borough and not time_of_day:
+        conn   = open_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT fare_bucket, trip_count
+            FROM summary_fare_distribution
+            ORDER BY
+                CASE fare_bucket
+                    WHEN '$0-$10'   THEN 1
+                    WHEN '$10-$20'  THEN 2
+                    WHEN '$20-$30'  THEN 3
+                    WHEN '$30-$40'  THEN 4
+                    WHEN '$40-$50'  THEN 5
+                    WHEN '$50-$75'  THEN 6
+                    WHEN '$75-$100' THEN 7
+                    ELSE 8
+                END
+        """)
+        data = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jsonify({"status": "success", "data": data})
+
+    conditions, params = build_conditions(borough, time_of_day)
+    query = """
+        SELECT
+            CASE
+                WHEN t.fare_amount <  10 THEN '$0-$10'
+                WHEN t.fare_amount <  20 THEN '$10-$20'
+                WHEN t.fare_amount <  30 THEN '$20-$30'
+                WHEN t.fare_amount <  40 THEN '$30-$40'
+                WHEN t.fare_amount <  50 THEN '$40-$50'
+                WHEN t.fare_amount <  75 THEN '$50-$75'
+                WHEN t.fare_amount < 100 THEN '$75-$100'
+                ELSE '$100+'
+            END AS fare_bucket,
+            COUNT(*) AS trip_count
+        FROM taxi_trips t
+        JOIN taxi_zones pu ON t.pu_location_id = pu.location_id
+    """
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " GROUP BY fare_bucket"
+
     conn   = open_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT fare_bucket, trip_count
-        FROM summary_fare_distribution
-        ORDER BY
-            CASE fare_bucket
-                WHEN '$0-$10'   THEN 1
-                WHEN '$10-$20'  THEN 2
-                WHEN '$20-$30'  THEN 3
-                WHEN '$30-$40'  THEN 4
-                WHEN '$40-$50'  THEN 5
-                WHEN '$50-$75'  THEN 6
-                WHEN '$75-$100' THEN 7
-                ELSE 8
-            END
-    """)
-    data = [dict(row) for row in cursor.fetchall()]
+    cursor.execute(query, params)
+    rows   = cursor.fetchall()
     conn.close()
-    return jsonify({"status": "success", "data": data})
 
+    bucket_order = {"$0-$10":1,"$10-$20":2,"$20-$30":3,"$30-$40":4,"$40-$50":5,"$50-$75":6,"$75-$100":7,"$100+":8}
+    data = sorted([dict(r) for r in rows], key=lambda x: bucket_order.get(x["fare_bucket"], 9))
+
+    return jsonify({"status": "success", "data": data})
 
 
 if __name__ == "__main__":
