@@ -1,6 +1,6 @@
-# NYC Urban Mobility Data Explorer
+# Urban Mobility Data Explorer
 
-A full-stack web application analyzing NYC Yellow Taxi trip patterns using real-world data from the NYC Taxi & Limousine Commission (TLC). This project demonstrates data engineering, algorithm design, database management, API development, and frontend visualization skills.
+A full-stack data engineering project that processes, stores, and visualises **33.8 million NYC Yellow Taxi trips (January – December 2025)**. The dashboard reveals how, when, where, and how much New York City moves through an interactive web interface backed by a Python ETL pipeline, a normalised SQLite database, and a Flask REST API.
 
 **Video Walkthrough:** [Add YouTube link here]
 
@@ -20,27 +20,6 @@ A full-stack web application analyzing NYC Yellow Taxi trip patterns using real-
 
 ---
 
-## Project Overview
-
-This application processes the full year of 2025 NYC Yellow Taxi trip data — 34.5 million raw records across 12 months. After a 14-rule cleaning pipeline the data is inserted into a normalized SQLite database. A separate summary computation pipeline pre-aggregates all analytics into 8 small summary tables for instant API responses. A Flask REST API serves 10 endpoints to an interactive frontend dashboard built with Chart.js and Leaflet.js.
-
----
-
-## Features
-
-- **Full Year Data** — 12 months of 2025 NYC Yellow Taxi trips (34.5M raw records)
-- **14-Rule Cleaning Pipeline** — transparent data validation with exclusion logging
-- **6 Derived Features** — trip duration, speed, fare per mile, tip percentage, time of day, is weekend
-- **Custom MinHeap Algorithm** — top K zone selection in O(n log k) without built-in sorting
-- **Normalized SQLite Database** — 2 main tables with foreign keys and 6 indexes
-- **Pre-computed Summary Tables** — 8 summary tables built from pandas for instant API responses
-- **10 REST API Endpoints** — dynamic filtering by borough, hour, and time of day
-- **Interactive Dashboard** — 3 themed sections with charts, map and data tables
-- **Choropleth Map** — zone-level trip density visualization using Leaflet.js
-- **Multiprocessing Pipeline** — parallel batch processing for fast data insertion and summary computation
-
----
-
 ## Project Structure
 
 ```
@@ -52,21 +31,21 @@ Urban_Mobility_Data_Explorer/
 │   │   └── logs/              ← cleaning logs and exclusion reports
 │   ├── src/
 │   │   └── cleaner.py         ← 14-rule data cleaning pipeline
-│   ├── download_trip_data.sh  ← downloads all data files
+│   ├── download_trip_data.sh  ← downloads all 12 monthly parquet files
 │   └── requirements.txt
 ├── scripts/
 │   ├── data/
-│   │   └── mobility.db        ← generated SQLite database
-│   ├── database.py            ← database schema and connection
-│   ├── insertionDB.py         ← multiprocessing batch insertion
-│   ├── compute_summaries.py   ← pre-computes 8 summary tables
-│   ├── convert_geojs.py       ← shapefile to GeoJSON conversion
+│   │   └── mobility.db        ← generated SQLite database (auto-created)
+│   ├── database.py            ← 3NF schema definition and connection utilities
+│   ├── insertionDB.py         ← multiprocessing batch insertion (1M rows/batch)
+│   ├── compute_summaries.py   ← pre-computes 8 summary tables via MinHeap + pandas
+│   ├── convert_geojs.py       ← converts shapefile to GeoJSON format
 │   ├── urbanAPI.py            ← Flask REST API with 10 endpoints
-│   └── zone_rank.py           ← custom MinHeap algorithm
+│   └── zone_rank.py           ← custom MinHeap O(n log k) algorithm
 ├── frontend/
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
+│   ├── index.html             ← single-page dashboard
+│   ├── style.css              ← styling
+│   └── app.js                 ← Chart.js + Leaflet.js visualisations
 ├── docs/
 │   ├── architecture_diagram.png
 │   └── Technical_Report.pdf
@@ -74,188 +53,231 @@ Urban_Mobility_Data_Explorer/
 └── README.md
 ```
 
+---
 
 ## Prerequisites
 
-- Python 3.8+
-- pip package manager
-- Modern web browser
-- Minimum 20GB free disk space
-- Minimum 8GB RAM recommended
+Before running the project, ensure you have the following installed:
 
-## Installation & Setup
+- **Python 3.10 or higher**
+- **Git**
+- **Bash** (Git Bash on Windows, Terminal on macOS/Linux)
+- **A modern web browser** (Chrome, Firefox, or Edge)
+- **pip package manager**
+- **Modern web browser**
+- **Minimum 10GB free disk space**
+- **Minimum 8GB RAM recommended**
 
-### 1. Install Dependencies
+Disk space required: approximately **8 GB** for raw parquet files, cleaned parquet, and the SQLite database.
+
+
+
+---
+
+## Installation and Setup
+
+### 1. Clone the Repository
 
 ```bash
-pip install flask flask-cors pandas geopandas pyarrow
+git clone https://github.com/ApongsehIyan23/Urban_Mobility_Data_Explorer.git
+cd Urban_Mobility_Data_Explorer
+```
+
+### 2. Create and Activate a Virtual Environment
+
+**Windows (Git Bash):**
+```bash
+python -m venv venv
+source venv/Scripts/activate
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
 pip install -r etl/requirements.txt
 ```
 
-### 2. Download Raw Data
+---
+
+## Running the Pipeline
+
+Run each step in order. Each step must complete successfully before moving to the next.
+
+### Step 1 — Download the Raw Data
 
 ```bash
-cd etl
-bash download_trip_data.sh
+bash etl/download_trip_data.sh
 ```
 
-Downloads 12 monthly parquet files, taxi_zone_lookup.csv and taxi_zones.zip to `etl/data/raw/`
+This downloads all 12 monthly NYC TLC Yellow Taxi parquet files for 2025 and the taxi zone lookup CSV into `etl/data/raw/`. The script includes disk space checks and resume capability.
 
-### 3. Clean the Data
+**Expected output:** 12 parquet files and `taxi_zone_lookup.csv` in `etl/data/raw/`
 
-```bash
-time python -u src/cleaner.py 2>&1 | tee data/logs/cleaning_run.txt
-```
-
-Generates `etl/data/processed/yellow_2025_clean.parquet` — 34.5M clean records (~20-25 minutes)
-
-### 4. Convert Shapefile to GeoJSON
+### Step 2 — Convert GeoJSON
 
 ```bash
-cd etl/data/raw
-unzip taxi_zones.zip
-cd ../../..
 python scripts/convert_geojs.py
 ```
 
-Generates `etl/data/raw/taxi_zones.geojson`
+Converts the taxi zones shapefile to GeoJSON format for use by the Leaflet.js choropleth map.
 
-### 5. Create Database and Insert Data
+**Expected output:** `taxi_zones.geojson` in `etl/data/raw/`
 
-```bash
-cd scripts
-python insertionDB.py
-```
-
-Generates `scripts/data/mobility.db` (~1-2 hours for 34.5M rows)
-
-### 6. Compute Summary Tables
+### Step 3 — Run the ETL Pipeline
 
 ```bash
-python compute_summaries.py
+PYTHONIOENCODING=utf-8 python -u etl/src/cleaner.py
 ```
 
-Pre-computes 8 summary tables for instant API responses (~10-15 minutes)
+Applies 14 cleaning rules to all 12 monthly parquet files in parallel using multiprocessing. Generates derived features (`trip_duration_minutes`, `fare_per_mile`, `time_of_day`, `speed_mph`, `tip_percentage`, `is_weekend`).
 
-### 7. Start Backend API
+**Expected output:**
+- `etl/data/processed/yellow_2025_clean.parquet` (~1.6 GB, ~33.8 million rows)
+- `etl/data/logs/yellow_2025_exclusions.parquet`
+- `etl/data/logs/cleaning_summary.txt`
+
+**Expected runtime:** approximately 3 minutes
+
+### Step 4 — Create the Database and Insert Data
 
 ```bash
-python urbanAPI.py
+python scripts/insertionDB.py
 ```
 
-Server runs on http://localhost:5000
+Creates the 3NF SQLite database schema and loads all 33.8 million cleaned trip records using multiprocessing with 1-million-row batches. Builds 6 indexes after insertion.
 
-### 8. Open Frontend
+**Expected output:** `scripts/data/mobility.db`
+
+**Expected runtime:** approximately 20 minutes
+
+### Step 5 — Pre-compute Summary Tables
 
 ```bash
-cd ../frontend
-python -m http.server 8000
+python scripts/compute_summaries.py
 ```
 
-Navigate to http://localhost:8000
+Reads the cleaned parquet file in parallel batches, computes all aggregations using Python and the custom MinHeap algorithm, and writes 8 summary tables to the database. These tables power instant API responses.
+
+**Expected output:** 8 summary tables written to `mobility.db` (~326 rows total)
+
+**Expected runtime:** approximately 2 minutes
+
+---
+
+## Running the Application
+
+### Start the Flask API
+
+Open a terminal and run:
+
+```bash
+python scripts/urbanAPI.py
+```
+
+The API will start on `http://localhost:5000`. Keep this terminal open while using the dashboard.
+
+To verify the API is running, open your browser and go to:
+```
+http://localhost:5000/api/stats/summary
+```
+
+You should see a JSON response with total trips, revenue, and other summary statistics.
+
+### Open the Frontend Dashboard
+
+In a second terminal (with the virtual environment activated), run:
+
+```bash
+start frontend/index.html
+```
+
+**macOS / Linux:**
+```bash
+open frontend/index.html
+```
+
+Or simply open `frontend/index.html` directly in your web browser.
+
+**Note:** The API must be running before opening the dashboard.
+
+---
 
 ## API Endpoints
 
-- `GET /api/zones` — All 265 NYC taxi zones
-- `GET /api/trips` — Filtered trip records (params: borough, hour, time_of_day, limit)
-- `GET /api/stats/summary` — Overall summary statistics
-- `GET /api/insights/hourly` — Trip counts and averages by hour
-- `GET /api/insights/top-zones` — Top K pickup zones via MinHeap
-- `GET /api/insights/borough-summary` — Aggregate statistics by borough
-- `GET /api/insights/weekend-vs-weekday` — Weekend vs weekday comparison
-- `GET /api/geojson` — GeoJSON with trip counts for map visualization
-- `GET /api/insights/payment-breakdown` — Payment method breakdown
-- `GET /api/insights/fare-distribution` — Fare amount distribution
+The Flask API runs on `http://localhost:5000` and exposes 10 endpoints:
 
-## Data Cleaning Pipeline
+| Endpoint | Description | Filters |
+|----------|-------------|---------|
+| `GET /api/zones` | All 265 taxi zones | — |
+| `GET /api/trips` | Paginated trip records | `borough`, `time_of_day`, `hour`, `limit`, `offset` |
+| `GET /api/stats/summary` | Overall KPI statistics | `borough`, `time_of_day`, `hour` |
+| `GET /api/insights/hourly` | Trip volume by hour (0–23) | `borough`, `time_of_day` |
+| `GET /api/insights/borough-summary` | Stats per borough | `borough`, `time_of_day`, `hour` |
+| `GET /api/insights/top-zones` | Top 15 busiest pickup zones (MinHeap) | `borough`, `time_of_day` |
+| `GET /api/insights/weekend-vs-weekday` | Weekday vs weekend comparison | `borough`, `time_of_day` |
+| `GET /api/insights/payment-breakdown` | Payment method distribution | `borough`, `time_of_day` |
+| `GET /api/insights/fare-distribution` | Fare range histogram | `borough`, `time_of_day` |
+| `GET /api/geojson` | GeoJSON with trip counts per zone | `borough`, `time_of_day` |
 
-14-rule pipeline applied across all 12 months:
+All filtered endpoints follow a dual-path pattern: no filters → instant pre-computed summary tables; filters applied → live query on the cleaned dataset.
 
-1. Invalid passenger count (must be 1-4)
-2. Out of range timestamps (must be within 2025)
-3. Invalid trip duration (dropoff before pickup)
-4. Invalid distance (must be > 0)
-5. Distance outliers (> 150 miles)
-6. Invalid fare amount
-7. Fare outliers (> $500)
-8. Invalid total amount
-9. Negative financial fields
-10. Invalid vendor ID
-11. Invalid rate code ID
-12. Invalid pickup location ID
-13. Invalid dropoff location ID
-14. Invalid payment type
+---
 
-**Results:** 48,722,602 raw records → 34,512,168 clean records (~70% retention)
+## Dashboard Features
 
-## Derived Features
+- **Sticky KPI strip** — total trips, revenue, avg fare, avg duration, avg speed, peak hour, top borough
+- **Global filter bar** — filter all visuals by borough and time of day with a single Apply Filters click
+- **Hourly line chart** — trip volume and average speed across 24 hours
+- **Radar chart** — weekday vs weekend comparison across 5 metrics
+- **Choropleth map** — Leaflet.js interactive map with trip density per zone
+- **Polar area chart** — top 15 busiest pickup zones (powered by MinHeap algorithm)
+- **Borough doughnut** — trip share across the five boroughs
+- **Fare histogram** — distribution of fares across 8 price ranges
+- **Payment doughnut** — credit card vs cash breakdown
+- **Explore section** — paginated trip records table with sorting and real-time API filters
 
-- `trip_duration_minutes` — Reveals congestion patterns
-- `speed_mph` — Shows traffic behavior by time
-- `fare_per_mile` — Reveals economic patterns
-- `time_of_day` — Categorizes trips (Morning/Afternoon/Evening/Night)
-- `tip_percentage` — Tipping behavior by borough
-- `is_weekend` — Weekend vs weekday flag
+---
 
-## Database Design
+## Algorithm — MinHeap O(n log k)
 
-**Normalized Schema:**
-- `taxi_zones` — Dimension table with 265 location records
-- `taxi_trips` — Fact table with 34.5M records and foreign keys to taxi_zones
+The top 15 busiest pickup zones are identified using a **custom MinHeap** implemented in `zone_rank.py` — no built-in `heapq`, `sort_values`, or library functions used. The algorithm runs during `compute_summaries.py` to pre-compute `summary_top_zones` and again at query time when borough or time-of-day filters are applied.
 
-**Indexes:** pickup_datetime, pu_location_id, do_location_id, time_of_day, is_weekend, payment_type
+**Time complexity:** O(n log k) where n = 263 zones, k = 15  
+**Space complexity:** O(k) — only 15 items held in memory at any time
 
-**Summary Tables:** summary_stats, summary_hourly, summary_borough, summary_weekend_weekday, summary_top_zones, summary_payment_breakdown, summary_fare_distribution, summary_zone_counts
+---
 
-## Technology Stack
+## Key Data Facts
 
-**Backend:**
-- Python 3.8+
-- Flask — API server
-- Pandas — data processing and summary computation
-- GeoPandas — spatial data
-- PyArrow — parquet file handling
-- Multiprocessing — parallel batch processing
-- SQLite — database
-- Custom MinHeap algorithm (no built-in sorting)
+- **Raw trips downloaded:** 48,722,602
+- **Clean trips retained:** 33,858,070 (69.5% retention rate)
+- **Total revenue (2025):** $983,484,978.67
+- **Peak hour:** 18:00 (6 PM)
+- **Dominant borough:** Manhattan (89% of all pickups)
+- **Most common fare range:** $10–$20 (43.7% of trips)
+- **Credit card payments:** 87.61%
 
-**Frontend:**
-- HTML5/CSS3
-- Vanilla JavaScript
-- Chart.js — visualizations
-- Leaflet.js — maps
+---
 
 ## Troubleshooting
 
-**ModuleNotFoundError**
-```bash
-pip install flask flask-cors pandas geopandas pyarrow
-```
+**API returns 500 errors:**  
+Ensure `compute_summaries.py` has been run and the summary tables exist in `mobility.db`.
 
-**Database not found**
-```bash
-cd scripts
-python insertionDB.py
-python compute_summaries.py
-```
+**Map not loading:**  
+Verify `taxi_zones.geojson` exists in `etl/data/raw/`. Run `convert_geojs.py` if missing.
 
-**CORS errors**
-- Ensure flask-cors is installed
-- Backend must be running on port 5000
+**Charts show no data:**  
+Confirm the Flask API is running on port 5000 before opening the frontend.
 
-**Map not loading**
-- Check that `etl/data/raw/taxi_zones.geojson` exists
-- Run `python scripts/convert_geojs.py` if missing
+**Windows encoding errors during ETL:**  
+Prefix commands with `PYTHONIOENCODING=utf-8`.
 
-**API endpoints returning errors**
-- Make sure both `insertionDB.py` and `compute_summaries.py` completed successfully
-- Restart Flask server
-
-## Data Source
-
-NYC Taxi & Limousine Commission (TLC)
-https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
-
-## License
-
-Educational project for academic purposes.
+**Slow filtered queries:**  
+Filtered queries run on live data. Manhattan (89% of trips) will be slowest. Brooklyn, Queens, and Bronx filters are significantly faster.
