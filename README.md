@@ -2,7 +2,7 @@
 
 A full-stack data engineering project that processes, stores, and visualises **33.8 million NYC Yellow Taxi trips (January – December 2025)**. The dashboard reveals how, when, where, and how much New York City moves through an interactive web interface backed by a Python ETL pipeline, a normalised SQLite database, and a Flask REST API.
 
-**Video Walkthrough:** [Add YouTube link here]
+**Video Walkthrough:** [https://drive.google.com/file/d/1rKbOfQWv4ddhx2xQjyYLFEahWyKvOgbl/view?usp=sharing]
 
 **Team Participation Sheet:** https://docs.google.com/spreadsheets/d/1vuZ_eRbSjXdiTRSMfGrG0e3FUks0LY68ZRaSe1h4wl4/edit?gid=0#gid=0
 
